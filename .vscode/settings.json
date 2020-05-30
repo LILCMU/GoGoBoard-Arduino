@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "iosfwd": "cpp",
+        "xtr1common": "cpp",
+        "type_traits": "cpp",
+        "utility": "cpp",
+        "xutility": "cpp"
+    }
+}
