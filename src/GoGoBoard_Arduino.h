@@ -163,6 +163,7 @@ private:
 
     static String _key;
     static gmessage gmessage_list;
+    static volatile bool isSerialAvailable;
 
     void turnOutputONOFF(int state);
     void turnOutputDirection(int dir);
@@ -174,6 +175,7 @@ private:
 
     String _dataStr;
 
+    uint8_t dataPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0};
     uint8_t cmdPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1e, 0x07, 0x00};
     uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1e};
     uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1f};

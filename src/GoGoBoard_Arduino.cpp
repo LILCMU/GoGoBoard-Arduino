@@ -3,10 +3,17 @@
 #include <HardwareTimer.h>
 #include <numeric>
 
-#include <USBSerial.h>
-extern USBSerial SerialUSB;
+// #if defined(__STM32F1__)
+// //? this for stm32 arduino maple
+// #include <usb_serial.h>
+// extern USBSerial Serial;
+// #define SerialUSB Serial
+// #else
+// //? this for stm32duino core
+// #include <USBSerial.h>
+// extern USBSerial SerialUSB;
+// #endif
 
-HardwareTimer gogoTimer(TIM1);
 #define gogoSerial Serial1
 
 // * //////////////////////////////////////////////////////////////
@@ -33,6 +40,7 @@ uint8_t GoGoBoard::gbl2ndExtCMDBuffer[64] = {0};
 
 String GoGoBoard::_key = String();
 gmessage GoGoBoard::gmessage_list;
+volatile bool GoGoBoard::isSerialAvailable = false;
 
 GoGoBoard::GoGoBoard(void) {}
 
@@ -135,12 +143,18 @@ String GoGoBoard::Gmessage(const String &key, const String &defaultValue)
 
 void GoGoBoard::irqCallback(void)
 {
-    static int counter = 0;
-    if (counter++ > 1000)
+    static int HBCounter = 0;
+    static int toggle = 0;
+    if (HBCounter++ > 1000)
     {
-        digitalToggle(GOGO_LED_PIN);
-        counter = 0;
+        toggle ^= 1;
+        digitalWrite(GOGO_LED_PIN, toggle);
+        HBCounter = 0;
     }
+
+    //? emulate delay 1ms but non-blocking process
+    if (!isSerialAvailable)
+        isSerialAvailable = true;
 
     gogoSerialEvent();
     processGmessage();
@@ -149,16 +163,24 @@ void GoGoBoard::irqCallback(void)
 void GoGoBoard::begin(void)
 {
     gogoSerial.begin(GOGO_DEFAULT_BAUDRATE);
-
     pinMode(GOGO_LED_PIN, OUTPUT);
 
-    gogoTimer.pause();
-    gogoTimer.setMode(1, TIMER_OUTPUT_COMPARE);
-    gogoTimer.setOverflow(1000, MICROSEC_FORMAT);               // in microseconds -> interrupt every 1ms
-    gogoTimer.setCaptureCompare(1, 1, MICROSEC_COMPARE_FORMAT); // overflow might be small
-    gogoTimer.attachInterrupt(1, irqCallback);
-    gogoTimer.refresh();
-    gogoTimer.resume();
+#if defined(__STM32F1__)
+    Timer1.pause();
+    Timer1.setMode(TIMER_CH1, TIMER_OUTPUTCOMPARE);
+    Timer1.setPeriod(1000);
+    Timer1.setCompare(TIMER_CH1, 1);
+    Timer1.attachInterrupt(TIMER_CH1, irqCallback);
+    Timer1.refresh();
+    Timer1.resume();
+
+#else
+    HardwareTimer *gogoTimer = new HardwareTimer(TIM1);
+    gogoTimer->setOverflow(1000, MICROSEC_FORMAT);
+    gogoTimer->attachInterrupt(irqCallback);
+    gogoTimer->resume();
+#endif
+
     // pinMode(GOGO_RESET_BUTTON, INPUT);
     // attachInterrupt(GOGO_RESET_BUTTON, resetCallback, HIGH);
 }
@@ -310,7 +332,8 @@ void GoGoBoard::sendGmessage(const String &key, const float value)
 {
     _dataStr = key + "," + String(value);
 
-    uint8_t dataPkt[_dataStr.length() + 2] = {TYPE_NUMBER, _dataStr.length()};
+    *(dataPkt) = TYPE_NUMBER;
+    *(dataPkt + 1) = _dataStr.length();
     memcpy(dataPkt + 2, _dataStr.c_str(), _dataStr.length());
 
     sendReportPacket(dataPkt, _dataStr.length() + 2);
@@ -320,7 +343,8 @@ void GoGoBoard::sendGmessage(const String &key, const String &value)
 {
     _dataStr = key + "," + value;
 
-    uint8_t dataPkt[_dataStr.length() + 2] = {TYPE_STRING, _dataStr.length()};
+    *(dataPkt) = TYPE_STRING;
+    *(dataPkt + 1) = _dataStr.length();
     memcpy(dataPkt + 2, _dataStr.c_str(), _dataStr.length());
 
     sendReportPacket(dataPkt, _dataStr.length() + 2);
@@ -335,8 +359,11 @@ void GoGoBoard::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetV
     cmdPkt[BYTE_DATA + 1] = value & 0xFF;
     cmdPkt[BYTE_CHECKSUM] = categoryID + cmdID + targetVal + value;
 
-    gogoSerial.write(cmdPkt, 11);
-    delay(2);
+    if (isSerialAvailable)
+    {
+        gogoSerial.write(cmdPkt, 11);
+        isSerialAvailable = false;
+    }
 }
 
 void GoGoBoard::sendCmdPacket(uint8_t *data, uint8_t length)
@@ -345,8 +372,11 @@ void GoGoBoard::sendCmdPacket(uint8_t *data, uint8_t length)
     memcpy(cmdDynamicPkt + BYTE_HEADER_OFFSET, data, length);
     cmdDynamicPkt[length + BYTE_HEADER_OFFSET] = std::accumulate(cmdDynamicPkt + BYTE_HEADER_OFFSET, cmdDynamicPkt + BYTE_HEADER_OFFSET + length, 0);
 
-    gogoSerial.write(cmdDynamicPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
-    delay(2);
+    if (isSerialAvailable)
+    {
+        gogoSerial.write(cmdDynamicPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
+        isSerialAvailable = false;
+    }
 }
 
 void GoGoBoard::sendReportPacket(uint8_t *data, uint8_t length)
@@ -356,6 +386,9 @@ void GoGoBoard::sendReportPacket(uint8_t *data, uint8_t length)
     memcpy(reportPkt + BYTE_HEADER_OFFSET, data, length);
     reportPkt[length + BYTE_HEADER_OFFSET] = std::accumulate(reportPkt + BYTE_HEADER_OFFSET, reportPkt + BYTE_HEADER_OFFSET + length, 0);
 
-    gogoSerial.write(reportPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
-    delay(5);
+    if (isSerialAvailable)
+    {
+        gogoSerial.write(reportPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
+        isSerialAvailable = false;
+    }
 }
