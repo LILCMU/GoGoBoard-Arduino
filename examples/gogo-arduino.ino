@@ -1,6 +1,6 @@
-#include <GoGoBoard_Arduino.h>
+#include <GoGoBoardArduino.h>
 
-GoGoBoard gogoIO;
+GoGoBoardArduino gogoIO;
 
 void setup()
 {

@@ -1,4 +1,4 @@
-#include "GoGoBoard_Arduino.h"
+#include "GoGoBoardArduino.h"
 
 #include <HardwareTimer.h>
 #include <numeric>

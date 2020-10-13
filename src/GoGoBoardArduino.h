@@ -181,4 +181,6 @@ private:
     uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1f};
 };
 
+class GoGoBoardArduino : public GoGoBoard {};
+
 #endif
