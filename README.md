@@ -28,7 +28,7 @@ void loop() {}
 | ------------ | -------------------------------------------- | ------------------------- | -------------------------- |
 | **Sensor**   | `readInput(`**param**`)`                     | port number (1,2,3,4)     | sensor value (0-1023)      |
 |              |
-| **Servo**    | `talkToServo(`**"param"**`)`                 | port name (A,B,C,D)       | -                          |
+| **Servo**    | `talkToServo(`**"param"**`)`                 | port name (1,2,3,4)       | -                          |
 |              | `setServoHead(`**param**`)`                  | servo angle (0-180)       | -                          |
 |              | `setServoThisWay(`**param**`)`               | servo angle (0-180)       | -                          |
 |              | `setServoThatWay(`**param**`)`               | servo angle (0-180)       | -                          |

@@ -254,19 +254,19 @@ void GoGoBoard::talkToOutput(String output_port)
 
     for (int i = 0; i < 4; i++)
     {
-        if (output_port[i] == 'a')
+        if (output_port[i] == '1')
         {
             motorBits |= 1;
         }
-        else if (output_port[i] == 'b')
+        else if (output_port[i] == '2')
         {
             motorBits |= 2;
         }
-        else if (output_port[i] == 'c')
+        else if (output_port[i] == '3')
         {
             motorBits |= 4;
         }
-        else if (output_port[i] == 'd')
+        else if (output_port[i] == '4')
         {
             motorBits |= 8;
         }
