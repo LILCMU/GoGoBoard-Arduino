@@ -10,6 +10,20 @@
 #define GOGO_RESET_BUTTON           PB2
 #define GOGO_LED_PIN                PB12
 
+#define GOGO_SPECIAL_D11            PA0
+#define GOGO_SPECIAL_D12            PA1
+#define GOGO_SPECIAL_D21            PA2
+#define GOGO_SPECIAL_D22            PA3
+#define GOGO_SPECIAL_SCL            PB6
+#define GOGO_SPECIAL_SDA            PB7
+
+#define GOGO_GPIO_RX                PA10
+#define GOGO_GPIO_TX                PA9
+#define GOGO_GPIO_MOSI              PA7
+#define GOGO_GPIO_MISO              PA6
+#define GOGO_GPIO_SCK               PA5
+#define GOGO_GPIO_NSS               PA4
+
 // * //////////////////////////////////////////////////////////////
 // *  Category Definitions
 #define CMD_PACKET                          0
