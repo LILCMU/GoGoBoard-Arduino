@@ -47,3 +47,25 @@ void loop() {}
 |              | `sendGmessage(`**"param"**`, `**"param"**`)` | key, string value         | -                          |
 |              | `isGmessageAvailable(`**"param"**`)`         | key                       | new message ? (true/false) |
 |              | `Gmessage(`**"param"**`, `**"param"**`)`     | key, default string value | string message             |
+
+---
+
+### List of pins definition (Alias names)
+
+| Alias names        | Arduino pins |
+| ------------------ | ------------ |
+| `GOGO_SPECIAL_D11` | PA0          |
+| `GOGO_SPECIAL_D12` | PA1          |
+| `GOGO_SPECIAL_D21` | PA2          |
+| `GOGO_SPECIAL_D22` | PA3          |
+| `GOGO_SPECIAL_SCL` | PB6          |
+| `GOGO_SPECIAL_SDA` | PB7          |
+|                    |              |
+| `GOGO_GPIO_RX`     | PA10         |
+| `GOGO_GPIO_TX`     | PA9          |
+| `GOGO_GPIO_MOSI`   | PA7          |
+| `GOGO_GPIO_MISO`   | PA6          |
+| `GOGO_GPIO_SCK`    | PA5          |
+| `GOGO_GPIO_NSS`    | PA4          |
+
+---
