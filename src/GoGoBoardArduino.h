@@ -103,7 +103,6 @@
 #define BYTE_HEADER_OFFSET          4       //? 54 fe type len (report pkt)
 
 typedef enum {
-    TYPE_UNDEFINE,
     TYPE_NUMBER,
     TYPE_STRING
 } logo_data_type;
