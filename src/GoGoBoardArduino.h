@@ -56,9 +56,7 @@
 #define CMD_SERVO_THATWAY                   16
 #define CMD_SERVO_SET_ANGLE                 17
 #define CMD_SERVO_TOGGLE_ACTIVE             18
-
-//* relay
-#define CMD_SERVO_PWR                       19
+#define CMD_SERVO_POWER                     19
 
 #define CMD_SYNC_RTC                        50
 #define CMD_READ_RTC                        51
@@ -128,6 +126,7 @@ public:
 
     //* Servo functions
     //? set servos to interact with ..
+    void talkToServo(int servo_port);
     void talkToServo(String servo_port);
     //? set servos head to input head_angle
     void setServoHead(int head_angle);
@@ -135,18 +134,23 @@ public:
     void turnServoThisWay(int cw_angle);
     //? turn servos counter-clockwise by input angle
     void turnServoThatWay(int ccw_angle);
+    //? set servos power (output servo ports with raw pwm duty)
+    void setServoPower(int power);
 
     //* Motor functions
     //? set output to interact with ..
+    void talkToOutput(int output_port);
     void talkToOutput(String output_port);
     //? set output power
     void setOutputPower(int power);
     //? turn outputs on or off
     void turnOutputON(void);
     void turnOutputOFF(void);
+    void turnOutputONOFF(int state);
     //? turn outputs direction
     void turnOutputThisWay(void);
     void turnOutputThatWay(void);
+    void turnOutputDirection(int dir);
     void toggleOutputWay(void);
 
     void beep(void);
@@ -177,9 +181,6 @@ private:
     static String _key;
     static gmessage gmessage_list;
     static volatile bool isSerialAvailable;
-
-    void turnOutputONOFF(int state);
-    void turnOutputDirection(int dir);
 
     void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0);
     void sendCmdPacket(uint8_t *data, uint8_t length);

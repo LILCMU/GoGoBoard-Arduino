@@ -24,29 +24,34 @@ void loop() {}
 
 ### List of commands
 
-|              | Functions name                               | Parameter(s)              | Return value               |
-| ------------ | -------------------------------------------- | ------------------------- | -------------------------- |
-| **Sensor**   | `readInput(`**param**`)`                     | port number (1,2,3,4)     | sensor value (0-1023)      |
+|              | Functions name                               | Parameter(s)                   | Return value               |
+| ------------ | -------------------------------------------- | ------------------------------ | -------------------------- |
+| **Sensor**   | `readInput(`**param**`)`                     | port number (1,2,3,4)          | sensor value (0-1023)      |
 |              |
-| **Servo**    | `talkToServo(`**"param"**`)`                 | port name (1,2,3,4)       | -                          |
-|              | `setServoHead(`**param**`)`                  | servo angle (0-180)       | -                          |
-|              | `setServoThisWay(`**param**`)`               | servo angle (0-180)       | -                          |
-|              | `setServoThatWay(`**param**`)`               | servo angle (0-180)       | -                          |
+| **Servo**    | `talkToServo(`**"param"**`)`                 | port name (1,2,3,4)            | -                          |
+|              | `talkToServo(`**param**`)`                   | port number (1,2,3,4)          | -                          |
+|              | `setServoHead(`**param**`)`                  | servo angle (0-180)            | -                          |
+|              | `setServoThisWay(`**param**`)`               | servo angle (0-180)            | -                          |
+|              | `setServoThatWay(`**param**`)`               | servo angle (0-180)            | -                          |
+|              | `setServoPower(`**param**`)`                 | servo power (0-100)            | -                          |
 |              |
-| **Output**   | `talkToOutput(`**"param"**`)`                | port name (1,2,3,4)       | -                          |
-|              | `setOutputPower(`**param**`)`                | power value (0-100)       | -                          |
-|              | `turnOutputON()`                             | -                         | -                          |
-|              | `turnOutputOFF()`                            | -                         | -                          |
-|              | `turnOutputThisWay()`                        | -                         | -                          |
-|              | `turnOutputThatWay()`                        | -                         | -                          |
-|              | `toggleOutputWay()`                          | -                         | -                          |
+| **Output**   | `talkToOutput(`**"param"**`)`                | port name (1,2,3,4)            | -                          |
+|              | `talkToOutput(`**param**`)`                  | port number (1,2,3,4)          | -                          |
+|              | `setOutputPower(`**param**`)`                | power value (0-100)            | -                          |
+|              | `turnOutputON()`                             | -                              | -                          |
+|              | `turnOutputOFF()`                            | -                              | -                          |
+|              | `turnOutputONOFF(`**param**`)`               | on-off status (1=on, 0=off)    | -                          |
+|              | `turnOutputThisWay()`                        | -                              | -                          |
+|              | `turnOutputThatWay()`                        | -                              | -                          |
+|              | `toggleOutputWay()`                          | -                              | -                          |
+|              | `turnOutputDirection(`**param**`)`           | direction number (1=CW, 0=CCW) | -                          |
 |              |
-| **Sound**    | `beep()`                                     | -                         | -                          |
+| **Sound**    | `beep()`                                     | -                              | -                          |
 |              |
-| **Gmessage** | `sendGmessage(`**"param"**`, `**param**`)`   | key, number value         | -                          |
-|              | `sendGmessage(`**"param"**`, `**"param"**`)` | key, string value         | -                          |
-|              | `isGmessageAvailable(`**"param"**`)`         | key                       | new message ? (true/false) |
-|              | `Gmessage(`**"param"**`, `**"param"**`)`     | key, default string value | string message             |
+| **Gmessage** | `sendGmessage(`**"param"**`, `**param**`)`   | key, number value              | -                          |
+|              | `sendGmessage(`**"param"**`, `**"param"**`)` | key, string value              | -                          |
+|              | `isGmessageAvailable(`**"param"**`)`         | key                            | new message ? (true/false) |
+|              | `Gmessage(`**"param"**`, `**"param"**`)`     | key, default string value      | string message             |
 
 ---
 

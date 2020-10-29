@@ -220,6 +220,17 @@ void GoGoBoard::talkToServo(String servo_port)
     sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, servoBits, 0);
 }
 
+void GoGoBoard::talkToServo(int servo_port)
+{
+    uint8_t servoBits = 0;
+
+    if (servo_port < 1 || servo_port > 4)
+        return;
+
+    bitSet(servoBits, servo_port);
+    sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, servoBits, 0);
+}
+
 void GoGoBoard::setServoHead(int head_angle)
 {
     if (head_angle < 0 || head_angle > 180)
@@ -244,10 +255,17 @@ void GoGoBoard::turnServoThatWay(int ccw_angle)
     sendCmdPacket(CMD_PACKET, CMD_SERVO_THATWAY, 0, ccw_angle);
 }
 
+void GoGoBoard::setServoPower(int power)
+{
+    if (power < 0 || power > 100)
+        return;
+    
+    sendCmdPacket(CMD_PACKET, CMD_SERVO_POWER, 0, power);
+}
+
 void GoGoBoard::talkToOutput(String output_port)
 {
     uint8_t motorBits = 0;
-    output_port.toLowerCase();
 
     if (output_port.length() < 1 || output_port.length() > 4)
         return;
@@ -271,6 +289,17 @@ void GoGoBoard::talkToOutput(String output_port)
             motorBits |= 8;
         }
     }
+    sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, motorBits, 0);
+}
+
+void GoGoBoard::talkToOutput(int output_port)
+{
+    uint8_t motorBits = 0;
+
+    if (output_port < 1 || output_port > 4)
+        return;
+
+    bitSet(motorBits, output_port);
     sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, motorBits, 0);
 }
 
