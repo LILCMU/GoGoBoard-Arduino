@@ -17,8 +17,8 @@
 #define GOGO_SPECIAL_SCL            PB6
 #define GOGO_SPECIAL_SDA            PB7
 
-#define GOGO_GPIO_RX                PA10
-#define GOGO_GPIO_TX                PA9
+#define GOGO_GPIO_RX                PB11
+#define GOGO_GPIO_TX                PB10
 #define GOGO_GPIO_MOSI              PA7
 #define GOGO_GPIO_MISO              PA6
 #define GOGO_GPIO_SCK               PA5
