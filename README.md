@@ -66,8 +66,8 @@ void loop() {}
 | `GOGO_SPECIAL_SCL` | PB6          |
 | `GOGO_SPECIAL_SDA` | PB7          |
 |                    |              |
-| `GOGO_GPIO_RX`     | PA10         |
-| `GOGO_GPIO_TX`     | PA9          |
+| `GOGO_GPIO_RX`     | PB11         |
+| `GOGO_GPIO_TX`     | PB10         |
 | `GOGO_GPIO_MOSI`   | PA7          |
 | `GOGO_GPIO_MISO`   | PA6          |
 | `GOGO_GPIO_SCK`    | PA5          |
