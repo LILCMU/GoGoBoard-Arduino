@@ -24,6 +24,10 @@
 #define GOGO_GPIO_SCK               PA5
 #define GOGO_GPIO_NSS               PA4
 
+#define ARDUINO_CMD_PACKET_TYPE         30
+#define ARDUINO_GMESSAGE_PACKET_TYPE    31
+#define ARDUINO_REQUEST_PACKET_TYPE     32
+
 // * //////////////////////////////////////////////////////////////
 // *  Category Definitions
 #define CMD_PACKET                          0
@@ -91,6 +95,10 @@
 
 #define RCMD_GOGOID                         1
 
+#define REQ_READ_INPUT                      1
+#define REQ_READ_FILTERED_INPUT             2
+
+#define BYTE_PACKET_TYPE            2
 #define BYTE_PACKET_LENGTH          3
 #define BYTE_CATEGORY_ID            5
 #define BYTE_CMD_ID                 6
@@ -167,22 +175,24 @@ private:
     // static void resetCallback(void);
     static void irqCallback(void);
     static void gogoSerialEvent(void);
-    static void processGmessage(void);
+    static void processPacket(void);
 
     static uint8_t gblExtSerialState;
+    static uint8_t gblExtSerialPacketType;
     static uint8_t gblExtSerialCmdChecksum;
     static uint8_t inExtLength;
     static uint8_t gblExtSerialCmdCounter;
     static bool gblUseFirstExtCmdBuffer;
     static bool gblNewExtCmdReady;
+    static bool gblRequestResponseAvailable;
     static uint8_t gbl1stExtCMDBuffer[];
     static uint8_t gbl2ndExtCMDBuffer[];
+    static uint8_t *gblActiveBuffer;
 
     static String _key;
     static gmessage gmessage_list;
-    static volatile bool isSerialAvailable;
 
-    void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0);
+    void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0, bool isCmd = true);
     void sendCmdPacket(uint8_t *data, uint8_t length);
 
     void sendReportPacket(uint8_t *data, uint8_t length);
@@ -190,9 +200,9 @@ private:
     String _dataStr;
 
     uint8_t dataPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0};
-    uint8_t cmdPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1e, 0x07, 0x00};
-    uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1e};
-    uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, 0x1f};
+    uint8_t cmdPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE, 0x07, 0x00};
+    uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE};
+    uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_GMESSAGE_PACKET_TYPE};
 };
 
 class GoGoBoardArduino : public GoGoBoard {};
