@@ -27,20 +27,20 @@
 #define SERIAL_1ST_HEADER               0x54
 #define SERIAL_2ND_HEADER               0xFE
 
-#define ARDUINO_REPORT_PACKET_TYPE      31
-
 uint8_t GoGoBoard::gblExtSerialState = SER_WAITING_FOR_1ST_HEADER;
+uint8_t GoGoBoard::gblExtSerialPacketType = 0;
 uint8_t GoGoBoard::gblExtSerialCmdChecksum = 0;
 uint8_t GoGoBoard::inExtLength = 0;
 uint8_t GoGoBoard::gblExtSerialCmdCounter = 0;
 bool GoGoBoard::gblUseFirstExtCmdBuffer = false;
 bool GoGoBoard::gblNewExtCmdReady = false;
+bool GoGoBoard::gblRequestResponseAvailable = false;
 uint8_t GoGoBoard::gbl1stExtCMDBuffer[64] = {0};
 uint8_t GoGoBoard::gbl2ndExtCMDBuffer[64] = {0};
+uint8_t *GoGoBoard::gblActiveBuffer = NULL;
 
 String GoGoBoard::_key = String();
 gmessage GoGoBoard::gmessage_list;
-volatile bool GoGoBoard::isSerialAvailable = false;
 
 GoGoBoard::GoGoBoard(void) {}
 
@@ -62,10 +62,19 @@ void GoGoBoard::gogoSerialEvent()
         }
         else
         {
-            if (inByte == ARDUINO_REPORT_PACKET_TYPE && gblExtSerialState == SER_CHECKING_PACKET_TYPE)
+            if (gblExtSerialState == SER_CHECKING_PACKET_TYPE)
             {
                 gblExtSerialCmdChecksum = 0;
                 gblExtSerialState = SER_WAITING_FOR_LENGTH;
+
+                if (inByte == ARDUINO_GMESSAGE_PACKET_TYPE)
+                {
+                    gblExtSerialPacketType = ARDUINO_GMESSAGE_PACKET_TYPE;
+                }
+                else if (inByte == ARDUINO_REQUEST_PACKET_TYPE)
+                {
+                    gblExtSerialPacketType = ARDUINO_REQUEST_PACKET_TYPE;
+                }
             }
             else if (gblExtSerialState == SER_WAITING_FOR_LENGTH)
             {
@@ -102,19 +111,29 @@ void GoGoBoard::gogoSerialEvent()
     }
 }
 
-void GoGoBoard::processGmessage()
+void GoGoBoard::processPacket()
 {
     if (gblNewExtCmdReady)
     {
         //? using first buffer, its inverted value
-        uint8_t *buf = (!gblUseFirstExtCmdBuffer) ? gbl1stExtCMDBuffer : gbl2ndExtCMDBuffer;
-        buf[buf[1] + 2] = '\0'; //? add null terminator
+        gblActiveBuffer = (!gblUseFirstExtCmdBuffer) ? gbl1stExtCMDBuffer : gbl2ndExtCMDBuffer;
 
-        char *p = (char *)buf + 2;
-        _key = String(strtok_r(p, ",", &p));
+        switch (gblExtSerialPacketType)
+        {
+        case ARDUINO_REQUEST_PACKET_TYPE:
+            gblRequestResponseAvailable = true;
+            break;
 
-        gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
-        gmessage_list[_key].isNewValue = true;
+        case ARDUINO_GMESSAGE_PACKET_TYPE:
+            gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
+
+            char *p = (char *)gblActiveBuffer + 2;
+            _key = String(strtok_r(p, ",", &p));
+
+            gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
+            gmessage_list[_key].isNewValue = true;
+            break;
+        }
 
         gblNewExtCmdReady = false;
     }
@@ -152,12 +171,8 @@ void GoGoBoard::irqCallback(void)
         HBCounter = 0;
     }
 
-    //? emulate delay 1ms but non-blocking process
-    if (!isSerialAvailable)
-        isSerialAvailable = true;
-
     gogoSerialEvent();
-    processGmessage();
+    processPacket();
 }
 
 void GoGoBoard::begin(void)
@@ -181,14 +196,27 @@ void GoGoBoard::begin(void)
     gogoTimer->resume();
 #endif
 
-    // pinMode(GOGO_RESET_BUTTON, INPUT);
-    // attachInterrupt(GOGO_RESET_BUTTON, resetCallback, HIGH);
+    delay(100);
 }
 
 int GoGoBoard::readInput(uint8_t port)
 {
     if (port < 1 || port > 4)
         return 0;
+
+    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
+
+    delay(10); //? waiting for response
+    if (gblRequestResponseAvailable)
+    {
+        gblRequestResponseAvailable = false;
+
+        return (int)gblActiveBuffer[0] << 8 | gblActiveBuffer[1];
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 void GoGoBoard::talkToServo(String servo_port)
@@ -259,7 +287,7 @@ void GoGoBoard::setServoPower(int power)
 {
     if (power < 0 || power > 100)
         return;
-    
+
     sendCmdPacket(CMD_PACKET, CMD_SERVO_POWER, 0, power);
 }
 
@@ -379,8 +407,13 @@ void GoGoBoard::sendGmessage(const String &key, const String &value)
     sendReportPacket(dataPkt, _dataStr.length() + 2);
 }
 
-void GoGoBoard::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal, int value)
+void GoGoBoard::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal, int value, bool isCmd)
 {
+    if (isCmd)
+        cmdPkt[BYTE_PACKET_TYPE] = ARDUINO_CMD_PACKET_TYPE;
+    else
+        cmdPkt[BYTE_PACKET_TYPE] = ARDUINO_REQUEST_PACKET_TYPE;
+
     cmdPkt[BYTE_CATEGORY_ID] = categoryID;
     cmdPkt[BYTE_CMD_ID] = cmdID;
     cmdPkt[BYTE_TARGET] = targetVal;
@@ -388,11 +421,8 @@ void GoGoBoard::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetV
     cmdPkt[BYTE_DATA + 1] = value & 0xFF;
     cmdPkt[BYTE_CHECKSUM] = categoryID + cmdID + targetVal + value;
 
-    if (isSerialAvailable)
-    {
-        gogoSerial.write(cmdPkt, 11);
-        isSerialAvailable = false;
-    }
+    delay(5);
+    gogoSerial.write(cmdPkt, 11);
 }
 
 void GoGoBoard::sendCmdPacket(uint8_t *data, uint8_t length)
@@ -401,11 +431,8 @@ void GoGoBoard::sendCmdPacket(uint8_t *data, uint8_t length)
     memcpy(cmdDynamicPkt + BYTE_HEADER_OFFSET, data, length);
     cmdDynamicPkt[length + BYTE_HEADER_OFFSET] = std::accumulate(cmdDynamicPkt + BYTE_HEADER_OFFSET, cmdDynamicPkt + BYTE_HEADER_OFFSET + length, 0);
 
-    if (isSerialAvailable)
-    {
-        gogoSerial.write(cmdDynamicPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
-        isSerialAvailable = false;
-    }
+    delay(5);
+    gogoSerial.write(cmdDynamicPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
 }
 
 void GoGoBoard::sendReportPacket(uint8_t *data, uint8_t length)
@@ -415,9 +442,6 @@ void GoGoBoard::sendReportPacket(uint8_t *data, uint8_t length)
     memcpy(reportPkt + BYTE_HEADER_OFFSET, data, length);
     reportPkt[length + BYTE_HEADER_OFFSET] = std::accumulate(reportPkt + BYTE_HEADER_OFFSET, reportPkt + BYTE_HEADER_OFFSET + length, 0);
 
-    if (isSerialAvailable)
-    {
-        gogoSerial.write(reportPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
-        isSerialAvailable = false;
-    }
+    delay(5);
+    gogoSerial.write(reportPkt, length + BYTE_HEADER_OFFSET + 1); //? plus checksum byte
 }
