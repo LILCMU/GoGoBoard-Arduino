@@ -4,29 +4,33 @@
 #include <Arduino.h>
 #include <map>
 
-#define GOGO_DEFAULT_BAUDRATE       115200
-#define GOGO_DEFAULT_BUFFER_SIZE    256
+#define GOGO_DEFAULT_BAUDRATE               115200
+#define GOGO_DEFAULT_BUFFER_SIZE            256
 
-#define GOGO_RESET_BUTTON           PB2
-#define GOGO_LED_PIN                PB12
+#define GOGO_BOOT_BUTTON                    PB2
+#define GOGO_LED_PIN                        PB12
 
-#define GOGO_SPECIAL_D11            PA0
-#define GOGO_SPECIAL_D12            PA1
-#define GOGO_SPECIAL_D21            PA2
-#define GOGO_SPECIAL_D22            PA3
-#define GOGO_SPECIAL_SCL            PB6
-#define GOGO_SPECIAL_SDA            PB7
+#define GOGO_SPECIAL_SCL                    PB6
+#define GOGO_SPECIAL_SDA                    PB7
+#define GOGO_SPECIAL_D21                    PB8
+#define GOGO_SPECIAL_D22                    PB9
+#define GOGO_SPECIAL_D31                    PB10
+#define GOGO_SPECIAL_D32                    PB11
 
-#define GOGO_GPIO_RX                PB11
-#define GOGO_GPIO_TX                PB10
-#define GOGO_GPIO_MOSI              PA7
-#define GOGO_GPIO_MISO              PA6
-#define GOGO_GPIO_SCK               PA5
-#define GOGO_GPIO_NSS               PA4
+#define GOGO_GPIO_RX                        PA3
+#define GOGO_GPIO_TX                        PA2
+#define GOGO_GPIO_MOSI                      PA7
+#define GOGO_GPIO_MISO                      PA6
+#define GOGO_GPIO_SCK                       PA5
+#define GOGO_GPIO_NSS                       PA4
 
-#define ARDUINO_CMD_PACKET_TYPE         30
-#define ARDUINO_GMESSAGE_PACKET_TYPE    31
-#define ARDUINO_REQUEST_PACKET_TYPE     32
+#define ARDUINO_CMD_PACKET_TYPE             30
+#define ARDUINO_GMESSAGE_PACKET_TYPE        31
+#define ARDUINO_REQUEST_PACKET_TYPE         32
+#define ARDUINO_IOT_PACKET_TYPE             33
+
+#define IOT_BROADCAST_PROCESS_ID            100
+#define IOT_CLOUD_MESSAGE_PROCESS_ID        200
 
 // * //////////////////////////////////////////////////////////////
 // *  Category Definitions
@@ -37,6 +41,9 @@
 #define DATADRIVEN_CMD_PACKET               4
 #define HOPHER_CMD_PACKET                   5
 #define EVENT_REQUEST_PACKET                20
+
+#define CATEGORY_IOT_BROADCAST              0
+#define CATEGORY_IOT_CLOUD_MESSAGE          1
 
 // * //////////////////////////////////////////////////////////////
 // *  Command Definitions
@@ -84,6 +91,8 @@
 #define CMD_UPDATE_FW_OTA                   200
 #define CMD_UPDATE_FW_SERIAL                201
 
+#define CMD_ARDUINO_INIT                    210
+
 #define LOGO_SET_MEMORY_POINTER             1
 #define FLASH_SET_MEMORY_POINTER            2
 #define MEM_WRITE_BYTES                     3
@@ -98,8 +107,17 @@
 #define REQ_READ_INPUT                      1
 #define REQ_READ_FILTERED_INPUT             2
 
+#define IOT_BROADCAST_SET_CHANNEL           1
+#define IOT_BROADCAST_SET_PASSWORD          2
+#define IOT_BROADCAST_SEND                  3
+#define IOT_BROADCAST_RECEIVE               4
+
+#define IOT_CLOUD_MESSAGE_PUBLISH           1
+#define IOT_CLOUD_MESSAGE_SUBSCRIBE         2
+
 #define BYTE_PACKET_TYPE            2
 #define BYTE_PACKET_LENGTH          3
+#define BYTE_PACKET_ENDPOINT        4
 #define BYTE_CATEGORY_ID            5
 #define BYTE_CMD_ID                 6
 #define BYTE_TARGET                 7
@@ -116,9 +134,11 @@ typedef enum {
 typedef struct {
     bool isNewValue;
     String stringValue;
-} gmessage_element;
+} message_element;
 
-typedef std::map<const String, gmessage_element> gmessage;
+typedef std::map<const String, message_element> _gmessage;
+typedef std::map<const String, message_element> _cloudmessage;
+typedef std::map<const String, bool> _broadcast;
 
 class GoGoBoard
 {
@@ -165,11 +185,21 @@ public:
     // void playNote();
     // void setNoteTempo();
 
+    void connectToWifi(const String &ssid, const String &password);
+
     void sendGmessage(const String &key, const float value);
     void sendGmessage(const String &key, const String &value);
-    
     bool isGmessageAvailable(const String &key);
     String Gmessage(const String &key, const String &defaultValue = String());
+
+    void setBroadcastChannel(uint32_t channel);
+    void setBroadcastPassword(const String &password);
+    void sendBroadcast(const String &topic);
+    bool receiveBroadcast(const String &topic);
+
+    void sendCloudMessage(const String &topic, const String &payload);
+    bool isCloudMessageAvailable(const String &topic);
+    String Cloudmessage(const String &topic, const String &defaultValue = String());
 
 private:
     // static void resetCallback(void);
@@ -190,17 +220,21 @@ private:
     static uint8_t *gblActiveBuffer;
 
     static String _key;
-    static gmessage gmessage_list;
+    static _gmessage _gmessage_list;
+
+    static String _topic;
+    static _broadcast _broadcast_list;
+    static _cloudmessage _cloudmessage_list;
 
     void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0, bool isCmd = true);
-    void sendCmdPacket(uint8_t *data, uint8_t length);
+    void sendCmdPacket(uint8_t *data, uint8_t length, bool isCmd = true);
+    void sendIoTPacket(uint8_t categoryID, uint8_t cmdID, uint8_t *data, uint8_t length, bool isCmd = false);
 
     void sendReportPacket(uint8_t *data, uint8_t length);
 
     String _dataStr;
 
     uint8_t dataPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0};
-    uint8_t cmdPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE, 0x07, 0x00};
     uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE};
     uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_GMESSAGE_PACKET_TYPE};
 };

@@ -30,6 +30,14 @@ turnOutputThatWay	KEYWORD2
 turnOutputDirection	KEYWORD2
 toggleOutputWay	KEYWORD2
 beep	KEYWORD2
+connectToWifi	KEYWORD2
 sendGmessage	KEYWORD2
 isGmessageAvailable	KEYWORD2
 Gmessage	KEYWORD2
+setBroadcastChannel	KEYWORD2
+setBroadcastPassword	KEYWORD2
+sendBroadcast	KEYWORD2
+receiveBroadcast	KEYWORD2
+sendCloudMessage	KEYWORD2
+isCloudMessageAvailable	KEYWORD2
+Cloudmessage	KEYWORD2

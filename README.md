@@ -59,15 +59,15 @@ void loop() {}
 
 | Alias names        | Arduino pins |
 | ------------------ | ------------ |
-| `GOGO_SPECIAL_D11` | PA0          |
-| `GOGO_SPECIAL_D12` | PA1          |
-| `GOGO_SPECIAL_D21` | PA2          |
-| `GOGO_SPECIAL_D22` | PA3          |
 | `GOGO_SPECIAL_SCL` | PB6          |
 | `GOGO_SPECIAL_SDA` | PB7          |
+| `GOGO_SPECIAL_D21` | PB8          |
+| `GOGO_SPECIAL_D22` | PB9          |
+| `GOGO_SPECIAL_D31` | PB10         |
+| `GOGO_SPECIAL_D32` | PB11         |
 |                    |              |
-| `GOGO_GPIO_RX`     | PB11         |
-| `GOGO_GPIO_TX`     | PB10         |
+| `GOGO_GPIO_RX`     | PA3          |
+| `GOGO_GPIO_TX`     | PA2          |
 | `GOGO_GPIO_MOSI`   | PA7          |
 | `GOGO_GPIO_MISO`   | PA6          |
 | `GOGO_GPIO_SCK`    | PA5          |
