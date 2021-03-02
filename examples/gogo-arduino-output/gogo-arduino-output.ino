@@ -1,19 +1,17 @@
 #include <GoGoBoardArduino.h>
 
-GoGoBoardArduino gogoIO;
-
 void setup()
 {
-    gogoIO.begin();
+    GoGoBoard.begin();
 
     //? turn on output port 1 and 2
-    gogoIO.talkToOutput("12");
-    gogoIO.turnOutputON();
+    GoGoBoard.talkToOutput("12");
+    GoGoBoard.turnOutputON();
 }
 
 void loop()
 {
     //? toggle motor direction every 5 seconds
-    gogoIO.toggleOutputWay();
+    GoGoBoard.toggleOutputWay();
     delay(5000);
 }
