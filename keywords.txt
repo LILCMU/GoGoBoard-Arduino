@@ -1,12 +1,11 @@
 #######################################
-# Syntax Coloring Map For GoGoBoard
+# Syntax Coloring Map For GoGoBoardArduino
 #######################################
 
 #######################################
 # Datatypes (KEYWORD1)
 #######################################
 
-GoGoBoard	KEYWORD1
 GoGoBoardArduino	KEYWORD1
 
 #######################################

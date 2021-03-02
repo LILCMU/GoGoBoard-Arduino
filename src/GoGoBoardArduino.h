@@ -4,6 +4,17 @@
 #include <Arduino.h>
 #include <map>
 
+// * //////////////////////////////////////////////////////////////
+// *  Serial handler Definitions
+#define SER_WAITING_FOR_1ST_HEADER          1
+#define SER_WAITING_FOR_2ND_HEADER          2
+#define SER_WAITING_FOR_LENGTH              3
+#define SER_WAITING_FOR_CMD                 4
+#define SER_CHECKING_PACKET_TYPE            5
+
+#define SERIAL_1ST_HEADER                   0x54
+#define SERIAL_2ND_HEADER                   0xFE
+
 #define GOGO_DEFAULT_BAUDRATE               115200
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
@@ -17,12 +28,14 @@
 #define GOGO_SPECIAL_D31                    PB10
 #define GOGO_SPECIAL_D32                    PB11
 
-#define GOGO_GPIO_RX                        PA3
-#define GOGO_GPIO_TX                        PA2
+#define GOGO_GPIO_RX2                       PA3
+#define GOGO_GPIO_TX2                       PA2
 #define GOGO_GPIO_MOSI                      PA7
 #define GOGO_GPIO_MISO                      PA6
 #define GOGO_GPIO_SCK                       PA5
 #define GOGO_GPIO_NSS                       PA4
+#define GOGO_GPIO_SCL                       PB6
+#define GOGO_GPIO_SDA                       PB7
 
 #define ARDUINO_CMD_PACKET_TYPE             30
 #define ARDUINO_GMESSAGE_PACKET_TYPE        31
@@ -115,16 +128,16 @@
 #define IOT_CLOUD_MESSAGE_PUBLISH           1
 #define IOT_CLOUD_MESSAGE_SUBSCRIBE         2
 
-#define BYTE_PACKET_TYPE            2
-#define BYTE_PACKET_LENGTH          3
-#define BYTE_PACKET_ENDPOINT        4
-#define BYTE_CATEGORY_ID            5
-#define BYTE_CMD_ID                 6
-#define BYTE_TARGET                 7
-#define BYTE_DATA                   8
-#define BYTE_CHECKSUM               10
+#define BYTE_PACKET_TYPE                    2
+#define BYTE_PACKET_LENGTH                  3
+#define BYTE_PACKET_ENDPOINT                4
+#define BYTE_CATEGORY_ID                    5
+#define BYTE_CMD_ID                         6
+#define BYTE_TARGET                         7
+#define BYTE_DATA                           8
+#define BYTE_CHECKSUM                       10
 
-#define BYTE_HEADER_OFFSET          4       //? 54 fe type len (report pkt)
+#define BYTE_HEADER_OFFSET                  4       //? 54 fe type len (report pkt)
 
 typedef enum {
     TYPE_NUMBER,
@@ -140,11 +153,11 @@ typedef std::map<const String, message_element> _gmessage;
 typedef std::map<const String, message_element> _cloudmessage;
 typedef std::map<const String, bool> _broadcast;
 
-class GoGoBoard
+class GoGoBoardArduino
 {
 public:
-    GoGoBoard(void);
-    ~GoGoBoard(void);
+    GoGoBoardArduino(void);
+    ~GoGoBoardArduino(void);
 
     void begin(void);
 
@@ -239,6 +252,6 @@ private:
     uint8_t reportPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_GMESSAGE_PACKET_TYPE};
 };
 
-class GoGoBoardArduino : public GoGoBoard {};
+extern GoGoBoardArduino GoGoBoard;
 
 #endif

@@ -1,14 +1,12 @@
 #include <GoGoBoardArduino.h>
 
-GoGoBoardArduino gogoIO;
-
 void setup()
 {
-    gogoIO.begin();
+    GoGoBoard.begin();
 }
 
 void loop()
 {
-    gogoIO.beep();
+    GoGoBoard.beep();
     delay(1000);
 }
