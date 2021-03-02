@@ -12,11 +12,10 @@ GoGoBoard Arduino Library is an extension library for built-in STM32 chip aimed 
 
 ```cpp
 #include <GoGoBoardArduino.h>
-GoGoBoardArduino gogoIO;
 
 void setup()
 {
-    gogoIO.begin();
+    GoGoBoard.begin();
 }
 
 void loop() {}
