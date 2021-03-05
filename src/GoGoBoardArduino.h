@@ -167,8 +167,8 @@ public:
 
     //* Servo functions
     //? set servos to interact with ..
-    void talkToServo(int servo_port);
     void talkToServo(String servo_port);
+    void talkToServo(int param1, int param2 = 0, int param3 = 0, int param4 = 0);
     //? set servos head to input head_angle
     void setServoHead(int head_angle);
     //? turn servos clockwise by input angle
@@ -180,8 +180,8 @@ public:
 
     //* Motor functions
     //? set output to interact with ..
-    void talkToOutput(int output_port);
     void talkToOutput(String output_port);
+    void talkToOutput(int param1, int param2 = 0, int param3 = 0, int param4 = 0);
     //? set output power
     void setOutputPower(int power);
     //? turn outputs on or off
@@ -210,6 +210,7 @@ public:
     void sendBroadcast(const String &topic);
     bool receiveBroadcast(const String &topic);
 
+    void sendCloudMessage(const String &topic, const float payload);
     void sendCloudMessage(const String &topic, const String &payload);
     bool isCloudMessageAvailable(const String &topic);
     String Cloudmessage(const String &topic, const String &defaultValue = String());
@@ -238,6 +239,8 @@ private:
     static String _topic;
     static _broadcast _broadcast_list;
     static _cloudmessage _cloudmessage_list;
+
+    uint8_t portsToBits(const String &ports);
 
     void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0, bool isCmd = true);
     void sendCmdPacket(uint8_t *data, uint8_t length, bool isCmd = true);

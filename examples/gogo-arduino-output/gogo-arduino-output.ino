@@ -5,7 +5,7 @@ void setup()
     GoGoBoard.begin();
 
     //? turn on output port 1 and 2
-    GoGoBoard.talkToOutput("12");
+    GoGoBoard.talkToOutput(1,2);
     GoGoBoard.turnOutputON();
 }
 
