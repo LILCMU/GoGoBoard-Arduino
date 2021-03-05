@@ -4,6 +4,7 @@
         "xtr1common": "cpp",
         "type_traits": "cpp",
         "utility": "cpp",
-        "xutility": "cpp"
+        "xutility": "cpp",
+        "string_view": "cpp"
     }
 }

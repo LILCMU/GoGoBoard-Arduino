@@ -209,42 +209,20 @@ int GoGoBoardArduino::readInput(uint8_t port)
 
 void GoGoBoardArduino::talkToServo(String servo_port)
 {
-    uint8_t servoBits = 0;
-
     if (servo_port.length() < 1 || servo_port.length() > 4)
         return;
 
-    for (int i = 0; i < 4; i++)
-    {
-        if (servo_port[i] == '1')
-        {
-            servoBits |= 1;
-        }
-        else if (servo_port[i] == '2')
-        {
-            servoBits |= 2;
-        }
-        else if (servo_port[i] == '3')
-        {
-            servoBits |= 4;
-        }
-        else if (servo_port[i] == '4')
-        {
-            servoBits |= 8;
-        }
-    }
-    sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, servoBits);
+    sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, portsToBits(servo_port));
 }
 
-void GoGoBoardArduino::talkToServo(int servo_port)
+void GoGoBoardArduino::talkToServo(int param1, int param2, int param3, int param4)
 {
-    uint8_t servoBits = 0;
+    String servoStr = String(param1) + String(param2) + String(param3) + String(param4);
 
-    if (servo_port < 1 || servo_port > 4)
+    if (servoStr.length() < 1 || servoStr.length() > 4)
         return;
 
-    bitSet(servoBits, servo_port);
-    sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, servoBits);
+    sendCmdPacket(CMD_PACKET, CMD_SERVO_ACTIVE, portsToBits(servoStr));
 }
 
 void GoGoBoardArduino::setServoHead(int head_angle)
@@ -281,42 +259,20 @@ void GoGoBoardArduino::setServoPower(int power)
 
 void GoGoBoardArduino::talkToOutput(String output_port)
 {
-    uint8_t motorBits = 0;
-
     if (output_port.length() < 1 || output_port.length() > 4)
         return;
 
-    for (int i = 0; i < 4; i++)
-    {
-        if (output_port[i] == '1')
-        {
-            motorBits |= 1;
-        }
-        else if (output_port[i] == '2')
-        {
-            motorBits |= 2;
-        }
-        else if (output_port[i] == '3')
-        {
-            motorBits |= 4;
-        }
-        else if (output_port[i] == '4')
-        {
-            motorBits |= 8;
-        }
-    }
-    sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, motorBits);
+    sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, portsToBits(output_port));
 }
 
-void GoGoBoardArduino::talkToOutput(int output_port)
+void GoGoBoardArduino::talkToOutput(int param1, int param2, int param3, int param4)
 {
-    uint8_t motorBits = 0;
+    String outputStr = String(param1) + String(param2) + String(param3) + String(param4);
 
-    if (output_port < 1 || output_port > 4)
+    if (outputStr.length() < 1 || outputStr.length() > 4)
         return;
 
-    bitSet(motorBits, output_port);
-    sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, motorBits);
+    sendCmdPacket(CMD_PACKET, CMD_MOTOR_SET_ACTIVE, portsToBits(outputStr));
 }
 
 void GoGoBoardArduino::setOutputPower(int power)
@@ -457,6 +413,13 @@ bool GoGoBoardArduino::receiveBroadcast(const String &topic)
     return false;
 }
 
+void GoGoBoardArduino::sendCloudMessage(const String &topic, const float payload)
+{
+    _dataStr = topic + "," + String(payload);
+
+    sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_PUBLISH, (uint8_t *)_dataStr.c_str(), _dataStr.length());
+}
+
 void GoGoBoardArduino::sendCloudMessage(const String &topic, const String &payload)
 {
     _dataStr = topic + "," + payload;
@@ -487,6 +450,32 @@ String GoGoBoardArduino::Cloudmessage(const String &topic, const String &default
         return iotmessage->second.stringValue;
     }
     return defaultValue;
+}
+
+uint8_t GoGoBoardArduino::portsToBits(const String &ports)
+{
+    uint8_t bits = 0;
+
+    for (int i = 0; i < ports.length(); i++)
+    {
+        if (ports[i] == '1')
+        {
+            bits |= 1;
+        }
+        else if (ports[i] == '2')
+        {
+            bits |= 2;
+        }
+        else if (ports[i] == '3')
+        {
+            bits |= 4;
+        }
+        else if (ports[i] == '4')
+        {
+            bits |= 8;
+        }
+    }
+    return bits;
 }
 
 void GoGoBoardArduino::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal, int value, bool isCmd)
