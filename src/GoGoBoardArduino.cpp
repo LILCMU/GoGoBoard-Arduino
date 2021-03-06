@@ -163,7 +163,7 @@ void GoGoBoardArduino::irqCallback(void)
 
 void GoGoBoardArduino::begin(void)
 {
-    SerialUSB.begin(GOGO_DEFAULT_BAUDRATE);
+    SerialUSB.begin();
     gogoSerial.begin(GOGO_DEFAULT_BAUDRATE);
     pinMode(GOGO_LED_PIN, OUTPUT);
 

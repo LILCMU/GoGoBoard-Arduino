@@ -15,7 +15,7 @@
 #define SERIAL_1ST_HEADER                   0x54
 #define SERIAL_2ND_HEADER                   0xFE
 
-#define GOGO_DEFAULT_BAUDRATE               115200
+#define GOGO_DEFAULT_BAUDRATE               921600
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
 #define GOGO_BOOT_BUTTON                    PB2
