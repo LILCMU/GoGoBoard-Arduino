@@ -26,6 +26,7 @@ uint8_t GoGoBoardArduino::gblExtSerialCmdCounter = 0;
 bool GoGoBoardArduino::gblUseFirstExtCmdBuffer = false;
 bool GoGoBoardArduino::gblNewExtCmdReady = false;
 bool GoGoBoardArduino::gblRequestResponseAvailable = false;
+bool GoGoBoardArduino::gblResponseArduinoInit = false;
 uint8_t GoGoBoardArduino::gbl1stExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t GoGoBoardArduino::gbl2ndExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t *GoGoBoardArduino::gblActiveBuffer = NULL;
@@ -107,8 +108,20 @@ void GoGoBoardArduino::processPacket()
 
         switch (gblExtSerialPacketType)
         {
-        case ARDUINO_REQUEST_PACKET_TYPE:
-            gblRequestResponseAvailable = true;
+        case ARDUINO_REQUEST_PACKET_TYPE: //? response request packet type from gogoboard
+            switch ((gblActiveBuffer[0]))
+            {
+            case REQ_READ_INPUT:
+                gblRequestResponseAvailable = true;
+                break;
+
+            case CMD_ARDUINO_INIT:
+                gblResponseArduinoInit = true;
+                break;
+
+            default:
+                break;
+            }
             break;
 
         case ARDUINO_GMESSAGE_PACKET_TYPE:
@@ -183,8 +196,8 @@ void GoGoBoardArduino::begin(void)
     gogoTimer->resume();
 #endif
 
-    delay(3000); //? waiting for gogo to boot up
-    sendCmdPacket((uint8_t)CMD_PACKET, (uint8_t)CMD_ARDUINO_INIT);
+    delay(2000); //? waiting for gogo to boot up
+    sendCmdPacket((uint8_t)CMD_PACKET, (uint8_t)CMD_ARDUINO_INIT, 0, 0, false);
 }
 
 int GoGoBoardArduino::readInput(uint8_t port)
@@ -199,7 +212,7 @@ int GoGoBoardArduino::readInput(uint8_t port)
     {
         gblRequestResponseAvailable = false;
 
-        return (int)gblActiveBuffer[0] << 8 | gblActiveBuffer[1];
+        return (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
     }
     else
     {
@@ -393,7 +406,8 @@ void GoGoBoardArduino::setBroadcastPassword(const String &password)
 
 void GoGoBoardArduino::sendBroadcast(const String &topic)
 {
-    sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SEND, (uint8_t *)topic.c_str(), topic.length());
+    if (gblResponseArduinoInit)
+        sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SEND, (uint8_t *)topic.c_str(), topic.length());
 }
 
 bool GoGoBoardArduino::receiveBroadcast(const String &topic)
@@ -408,7 +422,8 @@ bool GoGoBoardArduino::receiveBroadcast(const String &topic)
     }
     else //? may not subscribe broadcast topic yet
     {
-        sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_RECEIVE, (uint8_t *)topic.c_str(), topic.length());
+        if (gblResponseArduinoInit)
+            sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_RECEIVE, (uint8_t *)topic.c_str(), topic.length());
     }
     return false;
 }
@@ -417,14 +432,16 @@ void GoGoBoardArduino::sendCloudMessage(const String &topic, const float payload
 {
     _dataStr = topic + "," + String(payload);
 
-    sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_PUBLISH, (uint8_t *)_dataStr.c_str(), _dataStr.length());
+    if (gblResponseArduinoInit)
+        sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_PUBLISH, (uint8_t *)_dataStr.c_str(), _dataStr.length());
 }
 
 void GoGoBoardArduino::sendCloudMessage(const String &topic, const String &payload)
 {
     _dataStr = topic + "," + payload;
 
-    sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_PUBLISH, (uint8_t *)_dataStr.c_str(), _dataStr.length());
+    if (gblResponseArduinoInit)
+        sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_PUBLISH, (uint8_t *)_dataStr.c_str(), _dataStr.length());
 }
 
 bool GoGoBoardArduino::isCloudMessageAvailable(const String &topic)
@@ -436,7 +453,8 @@ bool GoGoBoardArduino::isCloudMessageAvailable(const String &topic)
     }
     else //? may not subscribe cloudmessage topic yet
     {
-        sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_SUBSCRIBE, (uint8_t *)topic.c_str(), topic.length());
+        if (gblResponseArduinoInit)
+            sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_SUBSCRIBE, (uint8_t *)topic.c_str(), topic.length());
     }
     return false;
 }

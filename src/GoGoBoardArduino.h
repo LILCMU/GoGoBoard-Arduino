@@ -37,6 +37,9 @@
 #define GOGO_GPIO_SCL                       PB6
 #define GOGO_GPIO_SDA                       PB7
 
+#define ARDUINO_INIT_DEFAULT                0
+#define ARDUINO_INIT_IOT                    1
+
 #define ARDUINO_CMD_PACKET_TYPE             30
 #define ARDUINO_GMESSAGE_PACKET_TYPE        31
 #define ARDUINO_REQUEST_PACKET_TYPE         32
@@ -221,6 +224,7 @@ private:
     static void gogoSerialEvent(void);
     static void processPacket(void);
 
+
     static uint8_t gblExtSerialState;
     static uint8_t gblExtSerialPacketType;
     static uint8_t gblExtSerialCmdChecksum;
@@ -229,6 +233,7 @@ private:
     static bool gblUseFirstExtCmdBuffer;
     static bool gblNewExtCmdReady;
     static bool gblRequestResponseAvailable;
+    static bool gblResponseArduinoInit;
     static uint8_t gbl1stExtCMDBuffer[];
     static uint8_t gbl2ndExtCMDBuffer[];
     static uint8_t *gblActiveBuffer;
