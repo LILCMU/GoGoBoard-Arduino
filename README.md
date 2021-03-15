@@ -30,8 +30,8 @@ void loop() {}
 | **Servo**    | `talkToServo(`**"param"**`)`                    | port name (1,2,3,4)            | -                          |
 |              | `talkToServo(`**param**`)`                      | port number (1,2,3,4)          | -                          |
 |              | `setServoHead(`**param**`)`                     | servo angle (0-180)            | -                          |
-|              | `setServoThisWay(`**param**`)`                  | servo angle (0-180)            | -                          |
-|              | `setServoThatWay(`**param**`)`                  | servo angle (0-180)            | -                          |
+|              | `turnServoThisWay(`**param**`)`                 | servo angle (0-180)            | -                          |
+|              | `turnServoThatWay(`**param**`)`                 | servo angle (0-180)            | -                          |
 |              | `setServoPower(`**param**`)`                    | servo power (0-100)            | -                          |
 |              |
 | **Output**   | `talkToOutput(`**"param"**`)`                   | port name (1,2,3,4)            | -                          |
