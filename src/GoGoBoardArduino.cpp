@@ -1,20 +1,40 @@
 #include "GoGoBoardArduino.h"
 
-#include <HardwareTimer.h>
 #include <numeric>
 
 #if defined(__STM32F1__)
-//? this for stm32 arduino maple
+//? this for stm32 arduino maple (Roger Clark's Arduino_STM32)
+#include <HardwareTimer.h>
 #include <usb_serial.h>
 extern USBSerial Serial;
 #define SerialUSB Serial
-#else
+//? GoGo6 co-MCU uses USART1 (PA9 TX, PA10 RX) — alias the pre-defined
+//? Serial1 instance from the core instead of constructing HardwareSerial
+//? directly (Roger Clark's core expects a usart_dev*, not pin numbers).
+HardwareSerial& gogoSerial = Serial1;
+
+#elif defined(ARDUINO_ARCH_STM32)
 //? this for stm32duino core
+#include <HardwareTimer.h>
 #include <USBSerial.h>
 extern USBSerial SerialUSB;
+HardwareSerial gogoSerial(PA10, PA9);
+
+#elif defined(ARDUINO_ARCH_ESP32)
+//? GoGo7 co-MCU. Native USB-CDC is `Serial`; the GoGo-facing UART is
+//? UART1 with explicit RX/TX pins set in begin() from the GOGO7_*
+//? macros in the header.
+#define SerialUSB Serial
+HardwareSerial gogoSerial(1);
+
+#else
+#error "GoGoBoardArduino: unsupported target. Need STM32F1, stm32duino, or ESP32-C3."
 #endif
 
-HardwareSerial gogoSerial(PA10, PA9);
+#if defined(ARDUINO_ARCH_ESP32)
+static SemaphoreHandle_t gogoSerialSemaphore = NULL;
+static SemaphoreHandle_t gogoStateMutex = NULL;
+#endif
 
 GoGoBoardArduino GoGoBoard;
 
@@ -105,60 +125,76 @@ void GoGoBoardArduino::processPacket()
     {
         //? using first buffer, its inverted value
         gblActiveBuffer = (!gblUseFirstExtCmdBuffer) ? gbl1stExtCMDBuffer : gbl2ndExtCMDBuffer;
-
-        switch (gblExtSerialPacketType)
-        {
-        case ARDUINO_REQUEST_PACKET_TYPE: //? response request packet type from gogoboard
-            switch ((gblActiveBuffer[0]))
-            {
-            case REQ_READ_INPUT:
-                gblRequestResponseAvailable = true;
-                break;
-
-            case CMD_ARDUINO_INIT:
-                gblResponseArduinoInit = true;
-                break;
-
-            default:
-                break;
-            }
-            break;
-
-        case ARDUINO_GMESSAGE_PACKET_TYPE:
-        {
-            gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
-
-            char *p = (char *)gblActiveBuffer + 2;
-            _key = String(strtok_r(p, ",", &p));
-
-            _gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
-            _gmessage_list[_key].isNewValue = true;
-            break;
-        }
-
-        case ARDUINO_IOT_PACKET_TYPE:
-        {
-            gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
-
-            char *p = (char *)gblActiveBuffer + 2;
-            _topic = String(strtok_r(p, ",", &p));
-
-            if (gblActiveBuffer[0] == IOT_BROADCAST_PROCESS_ID)
-            {
-                _broadcast_list[_topic] = true;
-            }
-            else if (gblActiveBuffer[0] == IOT_CLOUD_MESSAGE_PROCESS_ID)
-            {
-                _cloudmessage_list[_topic].stringValue = String(strtok_r(p, ",", &p));
-                _cloudmessage_list[_topic].isNewValue = true;
-            }
-            break;
-        }
-        }
         gblNewExtCmdReady = false;
+
+#if defined(ARDUINO_ARCH_ESP32)
+        //? Acquire the shared-state mutex before touching
+        //? gblRequestResponseAvailable, gblResponseArduinoInit,
+        //? _gmessage_list, _broadcast_list, or _cloudmessage_list.
+        //? These are all read by the user's loop() task.
+        if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+        {
+#endif
+            switch (gblExtSerialPacketType)
+            {
+            case ARDUINO_REQUEST_PACKET_TYPE: //? response request packet type from gogoboard
+                switch ((gblActiveBuffer[0]))
+                {
+                case REQ_READ_INPUT:
+                    gblRequestResponseAvailable = true;
+                    break;
+
+                case CMD_ARDUINO_INIT:
+                    gblResponseArduinoInit = true;
+                    break;
+
+                default:
+                    break;
+                }
+                break;
+
+            case ARDUINO_GMESSAGE_PACKET_TYPE:
+            {
+                gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
+
+                char *p = (char *)gblActiveBuffer + 2;
+                _key = String(strtok_r(p, ",", &p));
+
+                _gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
+                _gmessage_list[_key].isNewValue = true;
+                break;
+            }
+
+            case ARDUINO_IOT_PACKET_TYPE:
+            {
+                gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
+
+                char *p = (char *)gblActiveBuffer + 2;
+                _topic = String(strtok_r(p, ",", &p));
+
+                if (gblActiveBuffer[0] == IOT_BROADCAST_PROCESS_ID)
+                {
+                    _broadcast_list[_topic] = true;
+                }
+                else if (gblActiveBuffer[0] == IOT_CLOUD_MESSAGE_PROCESS_ID)
+                {
+                    _cloudmessage_list[_topic].stringValue = String(strtok_r(p, ",", &p));
+                    _cloudmessage_list[_topic].isNewValue = true;
+                }
+                break;
+            }
+            }
+#if defined(ARDUINO_ARCH_ESP32)
+            xSemaphoreGive(gogoStateMutex);
+        }
+#endif
     }
 }
 
+#if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
+//? STM32 timer-ISR path. Heartbeats the LED + drives serial state machine.
+//? Drains ALL available UART bytes per ISR fire — a single read() was too
+//? slow (one byte per ms meant ~100 ms to parse a 100-byte packet).
 void GoGoBoardArduino::irqCallback(void)
 {
     static int HBCounter = 0;
@@ -170,15 +206,76 @@ void GoGoBoardArduino::irqCallback(void)
         HBCounter = 0;
     }
 
-    gogoSerialEvent();
+    while (gogoSerial.available())
+    {
+        gogoSerialEvent();
+    }
     processPacket();
 }
+#endif
+
+#if defined(ARDUINO_ARCH_ESP32)
+//? ESP32 event-driven packet handler. A binary semaphore blocks the
+//? task until the UART ISR signals data arrival. When woken, the task
+//? drains ALL available bytes in one burst then dispatches. No wasted
+//? polling cycles, no fixed-delay guesswork. 100 ms timeout prevents
+//? the task from blocking forever if the semaphore is never given.
+//?
+//? The onReceive callback is IRAM_ATTR and ISR-safe: it only gives a
+//? semaphore. All byte processing and String/map work stays in task
+//? context, matching the ESP-IDF pattern used on the main board.
+
+static void IRAM_ATTR onGogoSerialRx(void)
+{
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    xSemaphoreGiveFromISR(gogoSerialSemaphore, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken) {
+        portYIELD_FROM_ISR();
+    }
+}
+
+static void gogoSerialTask(void *)
+{
+    for (;;)
+    {
+        if (xSemaphoreTake(gogoSerialSemaphore, pdMS_TO_TICKS(100)) == pdTRUE)
+        {
+            // Drain all buffered bytes before processing any packet.
+            while (gogoSerial.available())
+            {
+                GoGoBoardArduino::gogoSerialEvent();
+            }
+            GoGoBoardArduino::processPacket();
+        }
+
+#if CONFIG_FREERTOS_USE_TRACE_FACILITY
+        // Stack watermark check — log if below 512 bytes free.
+        static uint32_t watermarkTick = 0;
+        if (++watermarkTick > 1000) {
+            watermarkTick = 0;
+            if (uxTaskGetStackHighWaterMark(NULL) < 512) {
+                SerialUSB.println("WARN: gogoSerial task stack low");
+            }
+        }
+#endif
+    }
+}
+#endif
 
 void GoGoBoardArduino::begin(void)
 {
-    SerialUSB.begin();
+    SerialUSB.begin(115200);
+#if defined(ARDUINO_ARCH_ESP32)
+    //? ESP32-C3 needs explicit RX/TX pins for non-default UART1 routing.
+    gogoSerial.begin(GOGO_DEFAULT_BAUDRATE, SERIAL_8N1, GOGO7_RX_PIN, GOGO7_TX_PIN);
+#else
     gogoSerial.begin(GOGO_DEFAULT_BAUDRATE);
+#endif
+
+#if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
+    //? GoGo Board 6 has a dedicated heartbeat LED. GoGo Board 7 omits it.
     pinMode(GOGO_LED_PIN, OUTPUT);
+#endif
 
 #if defined(__STM32F1__)
     Timer1.pause();
@@ -189,11 +286,32 @@ void GoGoBoardArduino::begin(void)
     Timer1.refresh();
     Timer1.resume();
 
-#else
+#elif defined(ARDUINO_ARCH_STM32)
     HardwareTimer *gogoTimer = new HardwareTimer(TIM1);
     gogoTimer->setOverflow(1000, MICROSEC_FORMAT);
     gogoTimer->attachInterrupt(irqCallback);
     gogoTimer->resume();
+
+#elif defined(ARDUINO_ARCH_ESP32)
+    //? Create synchronisation primitives and register the UART Rx
+    //? callback BEFORE spawning the task so the semaphore exists when
+    //? the first byte fires the ISR.
+    gogoSerialSemaphore = xSemaphoreCreateBinary();
+    gogoStateMutex = xSemaphoreCreateMutex();
+
+    gogoSerial.onReceive(onGogoSerialRx);
+
+    //? Spawn the packet-handler task at priority 2 (above loopTask at
+    //? priority 1) so serial processing is never starved by a
+    //? compute-bound user sketch.  4 KB stack is comfortable.
+    BaseType_t taskRc = xTaskCreate(gogoSerialTask, "gogoSerial",
+                                    4096, nullptr, 2, nullptr);
+    if (taskRc != pdPASS) {
+        SerialUSB.println("FATAL: failed to create gogoSerial task. "
+                          "GoGoBoard will not communicate.");
+        // Prevent the sketch from proceeding with a dead link.
+        for (;;) { vTaskDelay(pdMS_TO_TICKS(1000)); }
+    }
 #endif
 
     delay(2000); //? waiting for gogo to boot up
@@ -208,16 +326,29 @@ int GoGoBoardArduino::readInput(uint8_t port)
     sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
 
     delay(10); //? waiting for response
+    int result = 0;
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(20)) == pdTRUE)
+    {
+        if (gblRequestResponseAvailable)
+        {
+            gblRequestResponseAvailable = false;
+            result = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
+        }
+        xSemaphoreGive(gogoStateMutex);
+    }
+#else
+    //? STM32 path: single-threaded (ISR can interrupt).  Reading a
+    //? 2-byte value + bool flag from the buffer is atomic enough in
+    //? practice on Cortex-M3 with the current simple sketches.  A
+    //? proper mutex would require portENTER_CRITICAL here.
     if (gblRequestResponseAvailable)
     {
         gblRequestResponseAvailable = false;
-
-        return (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
+        result = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
     }
-    else
-    {
-        return 0;
-    }
+#endif
+    return result;
 }
 
 void GoGoBoardArduino::talkToServo(String servo_port)
@@ -373,16 +504,42 @@ void GoGoBoardArduino::sendGmessage(const String &key, const String &value)
 
 bool GoGoBoardArduino::isGmessageAvailable(const String &key)
 {
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        auto gmessage = _gmessage_list.find(key);
+        bool avail = (gmessage != _gmessage_list.end()) ? gmessage->second.isNewValue : false;
+        xSemaphoreGive(gogoStateMutex);
+        return avail;
+    }
+    return false;
+#else
     auto gmessage = _gmessage_list.find(key);
     if (gmessage != _gmessage_list.end())
     {
         return gmessage->second.isNewValue;
     }
     return false;
+#endif
 }
 
 String GoGoBoardArduino::Gmessage(const String &key, const String &defaultValue)
 {
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        auto gmessage = _gmessage_list.find(key);
+        if (gmessage != _gmessage_list.end())
+        {
+            gmessage->second.isNewValue = false;
+            String val = gmessage->second.stringValue;
+            xSemaphoreGive(gogoStateMutex);
+            return val;
+        }
+        xSemaphoreGive(gogoStateMutex);
+    }
+    return defaultValue;
+#else
     auto gmessage = _gmessage_list.find(key);
     if (gmessage != _gmessage_list.end())
     {
@@ -390,6 +547,7 @@ String GoGoBoardArduino::Gmessage(const String &key, const String &defaultValue)
         return gmessage->second.stringValue;
     }
     return defaultValue;
+#endif
 }
 
 void GoGoBoardArduino::setBroadcastChannel(uint32_t channel)
@@ -412,6 +570,30 @@ void GoGoBoardArduino::sendBroadcast(const String &topic)
 
 bool GoGoBoardArduino::receiveBroadcast(const String &topic)
 {
+#if defined(ARDUINO_ARCH_ESP32)
+    bool found = false;
+    bool status = false;
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        auto it = _broadcast_list.find(topic);
+        if (it != _broadcast_list.end())
+        {
+            found = true;
+            status = it->second;
+            if (status)
+                it->second = false;
+        }
+        xSemaphoreGive(gogoStateMutex);
+    }
+    if (found)
+        return status;
+
+    //? not yet subscribed — send subscribe request (outside mutex)
+    if (gblResponseArduinoInit)
+        sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_RECEIVE,
+                      (uint8_t *)topic.c_str(), topic.length());
+    return false;
+#else
     auto broadcast = _broadcast_list.find(topic);
     if (broadcast != _broadcast_list.end())
     {
@@ -423,9 +605,11 @@ bool GoGoBoardArduino::receiveBroadcast(const String &topic)
     else //? may not subscribe broadcast topic yet
     {
         if (gblResponseArduinoInit)
-            sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_RECEIVE, (uint8_t *)topic.c_str(), topic.length());
+            sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_RECEIVE,
+                          (uint8_t *)topic.c_str(), topic.length());
     }
     return false;
+#endif
 }
 
 void GoGoBoardArduino::sendCloudMessage(const String &topic, const float payload)
@@ -446,6 +630,28 @@ void GoGoBoardArduino::sendCloudMessage(const String &topic, const String &paylo
 
 bool GoGoBoardArduino::isCloudMessageAvailable(const String &topic)
 {
+#if defined(ARDUINO_ARCH_ESP32)
+    bool found = false;
+    bool avail = false;
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        auto it = _cloudmessage_list.find(topic);
+        if (it != _cloudmessage_list.end())
+        {
+            found = true;
+            avail = it->second.isNewValue;
+        }
+        xSemaphoreGive(gogoStateMutex);
+    }
+    if (found)
+        return avail;
+
+    //? not yet subscribed — send subscribe request (outside mutex)
+    if (gblResponseArduinoInit)
+        sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_SUBSCRIBE,
+                      (uint8_t *)topic.c_str(), topic.length());
+    return false;
+#else
     auto cloudmessage = _cloudmessage_list.find(topic);
     if (cloudmessage != _cloudmessage_list.end())
     {
@@ -454,13 +660,30 @@ bool GoGoBoardArduino::isCloudMessageAvailable(const String &topic)
     else //? may not subscribe cloudmessage topic yet
     {
         if (gblResponseArduinoInit)
-            sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_SUBSCRIBE, (uint8_t *)topic.c_str(), topic.length());
+            sendIoTPacket(CATEGORY_IOT_CLOUD_MESSAGE, IOT_CLOUD_MESSAGE_SUBSCRIBE,
+                          (uint8_t *)topic.c_str(), topic.length());
     }
     return false;
+#endif
 }
 
 String GoGoBoardArduino::Cloudmessage(const String &topic, const String &defaultValue)
 {
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        auto it = _cloudmessage_list.find(topic);
+        if (it != _cloudmessage_list.end())
+        {
+            it->second.isNewValue = false;
+            String val = it->second.stringValue;
+            xSemaphoreGive(gogoStateMutex);
+            return val;
+        }
+        xSemaphoreGive(gogoStateMutex);
+    }
+    return defaultValue;
+#else
     auto iotmessage = _cloudmessage_list.find(topic);
     if (iotmessage != _cloudmessage_list.end())
     {
@@ -468,6 +691,7 @@ String GoGoBoardArduino::Cloudmessage(const String &topic, const String &default
         return iotmessage->second.stringValue;
     }
     return defaultValue;
+#endif
 }
 
 uint8_t GoGoBoardArduino::portsToBits(const String &ports)

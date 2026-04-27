@@ -9,9 +9,9 @@ void setup()
 void loop()
 {
     //? retrieve light sensor value from other gogoboard via topic `gogo-light-sensor`
-    if (gogoIO.isCloudMessageAvailable("gogo-light-sensor"))
+    if (GoGoBoard.isCloudMessageAvailable("gogo-light-sensor"))
     {
-        Serial.println(gogoIO.Cloudmessage("gogo-light-sensor"));
+        Serial.println(GoGoBoard.Cloudmessage("gogo-light-sensor"));
     }
     delay(100);
 }

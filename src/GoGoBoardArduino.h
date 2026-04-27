@@ -18,6 +18,8 @@
 #define GOGO_DEFAULT_BAUDRATE               921600
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
+#if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
+//? GoGo6 hardware (STM32F103) — original pin map
 #define GOGO_BOOT_BUTTON                    PB2
 #define GOGO_LED_PIN                        PB12
 
@@ -36,6 +38,30 @@
 #define GOGO_GPIO_NSS                       PA4
 #define GOGO_GPIO_SCL                       PB6
 #define GOGO_GPIO_SDA                       PB7
+
+#elif defined(ARDUINO_ARCH_ESP32)
+//? GoGo7 hardware (ESP32-C3) — placeholders. TODO(gogo7-schematic): verify
+//? all values against the production board layout before shipping.
+#define GOGO_BOOT_BUTTON                    9
+
+#define GOGO_MULTI_SCL                      2
+#define GOGO_MULTI_SDA                      8
+#define GOGO_CONFIGURABLE_1_YELLOW          0
+#define GOGO_CONFIGURABLE_1_WHITE           1
+#define GOGO_CONFIGURABLE_2_YELLOW          3
+#define GOGO_CONFIGURABLE_2_WHITE           4
+
+#define GOGO_GPIO_DI                        5
+#define GOGO_GPIO_DO                        7
+#define GOGO_GPIO_CLK                       6
+#define GOGO_GPIO_CS                        10
+
+//? GoGo7 ESP32-C3 ↔ ESP32-S3 main-board UART link. Must match the S3-side
+//? EXT_SERIAL_RX_PIN / EXT_SERIAL_TX_PIN (currently 18 / 17 on the S3).
+//? Pin numbers on the C3 side depend on PCB routing.
+#define GOGO7_RX_PIN                        20
+#define GOGO7_TX_PIN                        21
+#endif
 
 #define ARDUINO_INIT_DEFAULT                0
 #define ARDUINO_INIT_IOT                    1
@@ -218,11 +244,15 @@ public:
     bool isCloudMessageAvailable(const String &topic);
     String Cloudmessage(const String &topic, const String &defaultValue = String());
 
+public:
+    //? Exposed so FreeRTOS task (gogoSerialTask) can call them.
+    //? Sketches should not invoke these directly.
+    static void gogoSerialEvent(void);
+    static void processPacket(void);
+
 private:
     // static void resetCallback(void);
     static void irqCallback(void);
-    static void gogoSerialEvent(void);
-    static void processPacket(void);
 
 
     static uint8_t gblExtSerialState;
