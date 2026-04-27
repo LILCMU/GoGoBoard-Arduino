@@ -315,7 +315,33 @@ void GoGoBoardArduino::begin(void)
 #endif
 
     delay(2000); //? waiting for gogo to boot up
+
+    //? Identify ourselves to the main board first, then run the legacy
+    //? init handshake. Order matters: future auto-detect logic on the
+    //? main board may use the HELLO frame to switch its parser into
+    //? Arduino-bridge mode before any other packet arrives.
+    sendHello();
     sendCmdPacket((uint8_t)CMD_PACKET, (uint8_t)CMD_ARDUINO_INIT, 0, 0, false);
+}
+
+void GoGoBoardArduino::sendHello(void)
+{
+    //? HELLO payload layout (after the standard 0x54 0xFE TYPE LEN frame):
+    //?   [endpoint=0][CMD_PACKET][CMD_HELLO][firmware_id]
+    //?   [proto_version][version_major][version_minor][version_patch]
+    //? Old gogo-firmware that doesn't recognise CMD_HELLO ignores the
+    //? whole packet (or logs unknown-cmd) — additive, no break.
+    uint8_t hello[8] = {
+        0,                                  // BYTE_PACKET_ENDPOINT
+        CMD_PACKET,                         // BYTE_CATEGORY_ID
+        CMD_HELLO,                          // BYTE_CMD_ID
+        GOGOBOARD_FIRMWARE_ID_ARDUINO,      // firmware identity
+        CMD_HELLO_PROTO_VERSION,            // payload schema version
+        GOGOBOARD_LIB_VERSION_MAJOR,
+        GOGOBOARD_LIB_VERSION_MINOR,
+        GOGOBOARD_LIB_VERSION_PATCH,
+    };
+    sendCmdPacket(hello, sizeof(hello));
 }
 
 int GoGoBoardArduino::readInput(uint8_t port)

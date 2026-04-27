@@ -135,6 +135,27 @@
 
 #define CMD_ARDUINO_INIT                    210
 
+//? HELLO handshake — emitted on begin() with a self-identifying payload
+//? so the main board (or future auto-detect logic) can tell which co-MCU
+//? firmware is running. Mirrors the role of T_HELLO on the Vernier link.
+#define CMD_HELLO                           220
+
+//? Firmware identity carried in the HELLO payload. Reserved values:
+//?   1 = GoGo Board Arduino library (this lib)
+//?   2 = Vernier sensor firmware (uses MsgPack T_HELLO instead — same id)
+//?   3 = Tasmota-bridge firmware (no native HELLO — fingerprinted)
+//? Bump CMD_HELLO_PROTO_VERSION when the HELLO payload layout breaks.
+#define GOGOBOARD_FIRMWARE_ID_ARDUINO       1
+#define GOGOBOARD_FIRMWARE_ID_VERNIER       2
+#define GOGOBOARD_FIRMWARE_ID_TASMOTA       3
+#define CMD_HELLO_PROTO_VERSION             1
+
+//? Library version, sent inside the HELLO payload. Keep in sync with
+//? library.properties `version=` field.
+#define GOGOBOARD_LIB_VERSION_MAJOR         2
+#define GOGOBOARD_LIB_VERSION_MINOR         0
+#define GOGOBOARD_LIB_VERSION_PATCH         0
+
 #define LOGO_SET_MEMORY_POINTER             1
 #define FLASH_SET_MEMORY_POINTER            2
 #define MEM_WRITE_BYTES                     3
@@ -280,6 +301,10 @@ private:
     void sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t targetVal = 0, int value = 0, bool isCmd = true);
     void sendCmdPacket(uint8_t *data, uint8_t length, bool isCmd = true);
     void sendIoTPacket(uint8_t categoryID, uint8_t cmdID, uint8_t *data, uint8_t length, bool isCmd = false);
+
+    //? Emits CMD_HELLO with firmware ID + version so the main board can
+    //? identify which co-MCU firmware is talking. Called from begin().
+    void sendHello(void);
 
     void sendReportPacket(uint8_t *data, uint8_t length);
 
