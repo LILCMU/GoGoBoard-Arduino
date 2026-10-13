@@ -136,8 +136,11 @@
 #define CMD_ARDUINO_INIT                    210
 
 //? HELLO handshake — emitted on begin() with a self-identifying payload
-//? so the main board (or future auto-detect logic) can tell which co-MCU
-//? firmware is running. Mirrors the role of T_HELLO on the Vernier link.
+//? so the main board's co-MCU detector can tell which co-MCU firmware is
+//? running. Mirrors the role of T_HELLO on the Vernier link. The main
+//? board can also ask for it again (it reboots alone, this board keeps
+//? running): ARDUINO_REQUEST_PACKET_TYPE frame 54 FE 20 02 DC DC, data
+//? byte CMD_HELLO. ESP32 answers with the same HELLO frame.
 #define CMD_HELLO                           220
 
 //? Firmware identity carried in the HELLO payload. Reserved values:
@@ -303,8 +306,9 @@ private:
     void sendIoTPacket(uint8_t categoryID, uint8_t cmdID, uint8_t *data, uint8_t length, bool isCmd = false);
 
     //? Emits CMD_HELLO with firmware ID + version so the main board can
-    //? identify which co-MCU firmware is talking. Called from begin().
-    void sendHello(void);
+    //? identify which co-MCU firmware is talking. Called from begin() and,
+    //? on ESP32, from the gogoSerial task when the main board asks.
+    static void sendHello(void);
 
     void sendReportPacket(uint8_t *data, uint8_t length);
 

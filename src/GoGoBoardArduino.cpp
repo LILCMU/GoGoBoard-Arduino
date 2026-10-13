@@ -132,6 +132,8 @@ void GoGoBoardArduino::processPacket()
         //? gblRequestResponseAvailable, gblResponseArduinoInit,
         //? _gmessage_list, _broadcast_list, or _cloudmessage_list.
         //? These are all read by the user's loop() task.
+        //? Set under the state mutex, answered after it is released.
+        bool helloRequested = false;
         if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
         {
 #endif
@@ -147,6 +149,15 @@ void GoGoBoardArduino::processPacket()
                 case CMD_ARDUINO_INIT:
                     gblResponseArduinoInit = true;
                     break;
+
+#if defined(ARDUINO_ARCH_ESP32)
+                //? The main board's co-MCU detector asks who is on the link
+                //? when it reboots while this board keeps running. STM32
+                //? runs this in a timer ISR, so only ESP32 answers.
+                case CMD_HELLO:
+                    helloRequested = true;
+                    break;
+#endif
 
                 default:
                     break;
@@ -187,6 +198,8 @@ void GoGoBoardArduino::processPacket()
 #if defined(ARDUINO_ARCH_ESP32)
             xSemaphoreGive(gogoStateMutex);
         }
+        if (helloRequested)
+            sendHello();
 #endif
     }
 }
@@ -341,7 +354,19 @@ void GoGoBoardArduino::sendHello(void)
         GOGOBOARD_LIB_VERSION_MINOR,
         GOGOBOARD_LIB_VERSION_PATCH,
     };
-    sendCmdPacket(hello, sizeof(hello));
+    //? Own frame buffer, sent in one write(): the gogoSerial task answers
+    //? a HELLO request with this while the sketch may be halfway through
+    //? a send that uses the shared cmdDynamicPkt. One write() keeps the
+    //? frame whole on the wire.
+    uint8_t frame[BYTE_HEADER_OFFSET + sizeof(hello) + 1] = {
+        SERIAL_1ST_HEADER,
+        SERIAL_2ND_HEADER,
+        ARDUINO_CMD_PACKET_TYPE,
+        sizeof(hello) + 1, //? LEN counts the checksum byte
+    };
+    memcpy(frame + BYTE_HEADER_OFFSET, hello, sizeof(hello));
+    frame[sizeof(frame) - 1] = std::accumulate(hello, hello + sizeof(hello), 0);
+    gogoSerial.write(frame, sizeof(frame));
 }
 
 int GoGoBoardArduino::readInput(uint8_t port)
