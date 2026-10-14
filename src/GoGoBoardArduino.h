@@ -15,11 +15,12 @@
 #define SERIAL_1ST_HEADER                   0x54
 #define SERIAL_2ND_HEADER                   0xFE
 
-#define GOGO_DEFAULT_BAUDRATE               921600
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
 #if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
 //? GoGo6 hardware (STM32F103) — original pin map
+#define GOGO_DEFAULT_BAUDRATE               921600
+
 #define GOGO_BOOT_BUTTON                    PB2
 #define GOGO_LED_PIN                        PB12
 
@@ -61,6 +62,8 @@
 //? Pin numbers on the C3 side depend on PCB routing.
 #define GOGO7_RX_PIN                        20
 #define GOGO7_TX_PIN                        21
+//? Must match the S3-side EXT_SERIAL_BAUDRATE, fixed at 115200 on GoGo 7.
+#define GOGO_DEFAULT_BAUDRATE               115200
 #endif
 
 #define ARDUINO_INIT_DEFAULT                0
