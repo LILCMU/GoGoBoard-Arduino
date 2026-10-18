@@ -34,6 +34,7 @@ HardwareSerial gogoSerial(1);
 #if defined(ARDUINO_ARCH_ESP32)
 static SemaphoreHandle_t gogoSerialSemaphore = NULL;
 static SemaphoreHandle_t gogoStateMutex = NULL;
+static SemaphoreHandle_t gogoInputReplySemaphore = NULL;
 #endif
 
 GoGoBoardArduino GoGoBoard;
@@ -45,7 +46,10 @@ uint8_t GoGoBoardArduino::inExtLength = 0;
 uint8_t GoGoBoardArduino::gblExtSerialCmdCounter = 0;
 bool GoGoBoardArduino::gblUseFirstExtCmdBuffer = false;
 bool GoGoBoardArduino::gblNewExtCmdReady = false;
-bool GoGoBoardArduino::gblRequestResponseAvailable = false;
+#if !defined(ARDUINO_ARCH_ESP32)
+volatile bool GoGoBoardArduino::gblInputReplyReady = false;
+#endif
+volatile int GoGoBoardArduino::gblInputReplyValue = 0;
 bool GoGoBoardArduino::gblResponseArduinoInit = false;
 uint8_t GoGoBoardArduino::gbl1stExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t GoGoBoardArduino::gbl2ndExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
@@ -129,7 +133,7 @@ void GoGoBoardArduino::processPacket()
 
 #if defined(ARDUINO_ARCH_ESP32)
         //? Acquire the shared-state mutex before touching
-        //? gblRequestResponseAvailable, gblResponseArduinoInit,
+        //? gblInputReplyValue, gblResponseArduinoInit,
         //? _gmessage_list, _broadcast_list, or _cloudmessage_list.
         //? These are all read by the user's loop() task.
         if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
@@ -141,7 +145,12 @@ void GoGoBoardArduino::processPacket()
                 switch ((gblActiveBuffer[0]))
                 {
                 case REQ_READ_INPUT:
-                    gblRequestResponseAvailable = true;
+                    gblInputReplyValue = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
+#if defined(ARDUINO_ARCH_ESP32)
+                    xSemaphoreGive(gogoInputReplySemaphore);
+#else
+                    gblInputReplyReady = true;
+#endif
                     break;
 
                 case CMD_ARDUINO_INIT:
@@ -298,6 +307,7 @@ void GoGoBoardArduino::begin(void)
     //? the first byte fires the ISR.
     gogoSerialSemaphore = xSemaphoreCreateBinary();
     gogoStateMutex = xSemaphoreCreateMutex();
+    gogoInputReplySemaphore = xSemaphoreCreateBinary();
 
     gogoSerial.onReceive(onGogoSerialRx);
 
@@ -349,30 +359,25 @@ int GoGoBoardArduino::readInput(uint8_t port)
     if (port < 1 || port > 4)
         return 0;
 
-    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
-
-    delay(10); //? waiting for response
-    int result = 0;
+    //? The main board answers 10-60 ms later and the reply carries no port,
+    //? so a reply that missed an earlier call's window is dropped first.
+    //? Otherwise it would be returned as this call's value.
 #if defined(ARDUINO_ARCH_ESP32)
-    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(20)) == pdTRUE)
-    {
-        if (gblRequestResponseAvailable)
-        {
-            gblRequestResponseAvailable = false;
-            result = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
-        }
-        xSemaphoreGive(gogoStateMutex);
-    }
+    xSemaphoreTake(gogoInputReplySemaphore, 0);
+    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
+    if (xSemaphoreTake(gogoInputReplySemaphore, pdMS_TO_TICKS(GOGO_READ_INPUT_TIMEOUT_MS)) != pdTRUE)
+        return 0;
+    int result = gblInputReplyValue;
 #else
-    //? STM32 path: single-threaded (ISR can interrupt).  Reading a
-    //? 2-byte value + bool flag from the buffer is atomic enough in
-    //? practice on Cortex-M3 with the current simple sketches.  A
-    //? proper mutex would require portENTER_CRITICAL here.
-    if (gblRequestResponseAvailable)
+    gblInputReplyReady = false;
+    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
+    uint32_t start = millis();
+    while (!gblInputReplyReady)
     {
-        gblRequestResponseAvailable = false;
-        result = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
+        if (millis() - start >= GOGO_READ_INPUT_TIMEOUT_MS)
+            return 0;
     }
+    int result = gblInputReplyValue;
 #endif
     return result;
 }

@@ -18,6 +18,10 @@
 #define GOGO_DEFAULT_BAUDRATE               921600
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
+//? readInput() gives up and returns 0 when the main board has not answered
+//? by then. The main board answers within 10-60 ms (50 ms poll + 10 ms delay).
+#define GOGO_READ_INPUT_TIMEOUT_MS          100
+
 #if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
 //? GoGo6 hardware (STM32F103) — original pin map
 #define GOGO_BOOT_BUTTON                    PB2
@@ -283,7 +287,10 @@ private:
     static uint8_t gblExtSerialCmdCounter;
     static bool gblUseFirstExtCmdBuffer;
     static bool gblNewExtCmdReady;
-    static bool gblRequestResponseAvailable;
+#if !defined(ARDUINO_ARCH_ESP32)
+    static volatile bool gblInputReplyReady;
+#endif
+    static volatile int gblInputReplyValue;
     static bool gblResponseArduinoInit;
     static uint8_t gbl1stExtCMDBuffer[];
     static uint8_t gbl2ndExtCMDBuffer[];
