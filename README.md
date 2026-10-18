@@ -48,7 +48,7 @@ void loop()
 
 |              | Function                                          | Parameter(s)                   | Return                       |
 | ------------ | ------------------------------------------------- | ------------------------------ | ---------------------------- |
-| **Sensor**   | `readInput(port)`                                 | port number (1–4)              | sensor value (0–1023)        |
+| **Sensor**   | `readInput(port)`                                 | port number (1–4)              | sensor value (0–1023); 0 if the main board does not answer within 100 ms |
 |              |                                                                                                                                |
 | **Servo**    | `talkToServo("ports")`                            | port string e.g. `"13"`        | —                            |
 |              | `talkToServo(p1, p2, p3, p4)`                     | port numbers (1–4)             | —                            |
