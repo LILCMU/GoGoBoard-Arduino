@@ -47,6 +47,7 @@ bool GoGoBoardArduino::gblUseFirstExtCmdBuffer = false;
 bool GoGoBoardArduino::gblNewExtCmdReady = false;
 bool GoGoBoardArduino::gblRequestResponseAvailable = false;
 bool GoGoBoardArduino::gblResponseArduinoInit = false;
+volatile bool GoGoBoardArduino::gblBroadcastChannelLost = false;
 uint8_t GoGoBoardArduino::gbl1stExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t GoGoBoardArduino::gbl2ndExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t *GoGoBoardArduino::gblActiveBuffer = NULL;
@@ -145,7 +146,15 @@ void GoGoBoardArduino::processPacket()
                     break;
 
                 case CMD_ARDUINO_INIT:
+                    //? The main board sends this ack after every reset of its
+                    //? extension tables (INIT, its own reboot), so the topics
+                    //? it knew and the broadcast channel are gone. Clearing
+                    //? the lists makes receiveBroadcast() and
+                    //? isCloudMessageAvailable() subscribe again.
                     gblResponseArduinoInit = true;
+                    _broadcast_list.clear();
+                    _cloudmessage_list.clear();
+                    gblBroadcastChannelLost = true;
                     break;
 
                 default:
@@ -578,6 +587,8 @@ String GoGoBoardArduino::Gmessage(const String &key, const String &defaultValue)
 
 void GoGoBoardArduino::setBroadcastChannel(uint32_t channel)
 {
+    _broadcastChannel = channel;
+    _hasBroadcastChannel = true;
     _dataStr = String(channel);
 
     sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SET_CHANNEL, (uint8_t *)_dataStr.c_str(), _dataStr.length());
@@ -588,14 +599,34 @@ void GoGoBoardArduino::setBroadcastPassword(const String &password)
     sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SET_CHANNEL, (uint8_t *)password.c_str(), password.length());
 }
 
+void GoGoBoardArduino::restoreBroadcastChannel(void)
+{
+    bool lost = false;
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        lost = gblBroadcastChannelLost;
+        gblBroadcastChannelLost = false;
+        xSemaphoreGive(gogoStateMutex);
+    }
+#else
+    lost = gblBroadcastChannelLost;
+    gblBroadcastChannelLost = false;
+#endif
+    if (lost && _hasBroadcastChannel)
+        setBroadcastChannel(_broadcastChannel);
+}
+
 void GoGoBoardArduino::sendBroadcast(const String &topic)
 {
+    restoreBroadcastChannel();
     if (gblResponseArduinoInit)
         sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SEND, (uint8_t *)topic.c_str(), topic.length());
 }
 
 bool GoGoBoardArduino::receiveBroadcast(const String &topic)
 {
+    restoreBroadcastChannel();
 #if defined(ARDUINO_ARCH_ESP32)
     bool found = false;
     bool status = false;

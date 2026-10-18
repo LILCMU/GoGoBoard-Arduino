@@ -285,6 +285,8 @@ private:
     static bool gblNewExtCmdReady;
     static bool gblRequestResponseAvailable;
     static bool gblResponseArduinoInit;
+    //? Set by the gogoSerial task on the init ack, read under the state mutex.
+    static volatile bool gblBroadcastChannelLost;
     static uint8_t gbl1stExtCMDBuffer[];
     static uint8_t gbl2ndExtCMDBuffer[];
     static uint8_t *gblActiveBuffer;
@@ -309,6 +311,12 @@ private:
     void sendReportPacket(uint8_t *data, uint8_t length);
 
     String _dataStr;
+
+    //? Last setBroadcastChannel() value. The main board keeps it in RAM only,
+    //? so it is sent again after the main board's init ack.
+    uint32_t _broadcastChannel = 0;
+    bool _hasBroadcastChannel = false;
+    void restoreBroadcastChannel(void);
 
     uint8_t dataPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0};
     uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE};
