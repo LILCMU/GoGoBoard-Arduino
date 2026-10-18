@@ -585,7 +585,7 @@ void GoGoBoardArduino::setBroadcastChannel(uint32_t channel)
 
 void GoGoBoardArduino::setBroadcastPassword(const String &password)
 {
-    sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SET_CHANNEL, (uint8_t *)password.c_str(), password.length());
+    sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SET_PASSWORD, (uint8_t *)password.c_str(), password.length());
 }
 
 void GoGoBoardArduino::sendBroadcast(const String &topic)
