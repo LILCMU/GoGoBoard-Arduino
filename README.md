@@ -129,6 +129,10 @@ GoGo Board 7's expansion-port pinout differs from GoGo Board 6 — the symbol na
 
 `GOGO7_RX_PIN` / `GOGO7_TX_PIN` are used internally by `GoGoBoard.begin()` — sketches typically don't need to reference them.
 
+### `Serial` on GoGo Board 7
+
+GPIO20/21 carry the link to the main board, and they are also the ESP32-C3's default UART0 pins. With **USB CDC On Boot** disabled (the default), `Serial` is UART0, so `Serial.begin()` would take those pins from the link and the board would stop obeying the sketch. In a sketch that includes `GoGoBoardArduino.h`, `Serial` is therefore the C3's USB port, the one the sketch is uploaded through, whatever the USB CDC On Boot setting. Open the Serial Monitor on that port. Do not use `Serial0`; it is still UART0.
+
 ## Examples
 
 `examples/` ships sketches for `beep`, `input`, `output`, `gmessage`, `broadcast`, `cloud-message`. Each compiles unchanged on both GoGo Board 6 and GoGo Board 7.

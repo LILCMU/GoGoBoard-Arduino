@@ -26,6 +26,9 @@ HardwareSerial gogoSerial(PA10, PA9);
 //? macros in the header.
 #define SerialUSB Serial
 HardwareSerial gogoSerial(1);
+#if defined(GOGO_SERIAL_ON_USB_JTAG)
+HWCDC GoGoUSBSerial;
+#endif
 
 #else
 #error "GoGoBoardArduino: unsupported target. Need STM32F1, stm32duino, or ESP32-C3."
