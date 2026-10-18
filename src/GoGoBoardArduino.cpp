@@ -119,6 +119,17 @@ void GoGoBoardArduino::gogoSerialEvent()
     }
 }
 
+//? "key,value" frames: the key ends at the first comma, the value is the
+//? rest of the text and may contain commas ("hello, world", JSON).
+char *GoGoBoardArduino::splitAtFirstComma(char *text)
+{
+    char *comma = strchr(text, ',');
+    if (comma == NULL)
+        return text + strlen(text);
+    *comma = '\0';
+    return comma + 1;
+}
+
 void GoGoBoardArduino::processPacket()
 {
     if (gblNewExtCmdReady)
@@ -157,10 +168,11 @@ void GoGoBoardArduino::processPacket()
             {
                 gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
 
-                char *p = (char *)gblActiveBuffer + 2;
-                _key = String(strtok_r(p, ",", &p));
+                char *text = (char *)gblActiveBuffer + 2;
+                char *value = splitAtFirstComma(text);
+                _key = String(text);
 
-                _gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
+                _gmessage_list[_key].stringValue = String(value);
                 _gmessage_list[_key].isNewValue = true;
                 break;
             }
@@ -169,8 +181,9 @@ void GoGoBoardArduino::processPacket()
             {
                 gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
 
-                char *p = (char *)gblActiveBuffer + 2;
-                _topic = String(strtok_r(p, ",", &p));
+                char *text = (char *)gblActiveBuffer + 2;
+                char *payload = splitAtFirstComma(text);
+                _topic = String(text);
 
                 if (gblActiveBuffer[0] == IOT_BROADCAST_PROCESS_ID)
                 {
@@ -178,7 +191,7 @@ void GoGoBoardArduino::processPacket()
                 }
                 else if (gblActiveBuffer[0] == IOT_CLOUD_MESSAGE_PROCESS_ID)
                 {
-                    _cloudmessage_list[_topic].stringValue = String(strtok_r(p, ",", &p));
+                    _cloudmessage_list[_topic].stringValue = String(payload);
                     _cloudmessage_list[_topic].isNewValue = true;
                 }
                 break;
