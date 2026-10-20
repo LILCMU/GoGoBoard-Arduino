@@ -171,7 +171,6 @@
 #define REQ_READ_FILTERED_INPUT             2
 
 #define IOT_BROADCAST_SET_CHANNEL           1
-#define IOT_BROADCAST_SET_PASSWORD          2
 #define IOT_BROADCAST_SEND                  3
 #define IOT_BROADCAST_RECEIVE               4
 
@@ -256,7 +255,6 @@ public:
     String Gmessage(const String &key, const String &defaultValue = String());
 
     void setBroadcastChannel(uint32_t channel);
-    void setBroadcastPassword(const String &password);
     void sendBroadcast(const String &topic);
     bool receiveBroadcast(const String &topic);
 

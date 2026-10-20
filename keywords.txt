@@ -34,7 +34,6 @@ sendGmessage	KEYWORD2
 isGmessageAvailable	KEYWORD2
 Gmessage	KEYWORD2
 setBroadcastChannel	KEYWORD2
-setBroadcastPassword	KEYWORD2
 sendBroadcast	KEYWORD2
 receiveBroadcast	KEYWORD2
 sendCloudMessage	KEYWORD2
