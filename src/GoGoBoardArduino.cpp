@@ -26,6 +26,9 @@ HardwareSerial gogoSerial(PA10, PA9);
 //? macros in the header.
 #define SerialUSB Serial
 HardwareSerial gogoSerial(1);
+#if defined(GOGO_SERIAL_ON_USB_JTAG)
+HWCDC GoGoUSBSerial;
+#endif
 
 #else
 #error "GoGoBoardArduino: unsupported target. Need STM32F1, stm32duino, or ESP32-C3."
@@ -47,6 +50,7 @@ bool GoGoBoardArduino::gblUseFirstExtCmdBuffer = false;
 bool GoGoBoardArduino::gblNewExtCmdReady = false;
 bool GoGoBoardArduino::gblRequestResponseAvailable = false;
 bool GoGoBoardArduino::gblResponseArduinoInit = false;
+volatile bool GoGoBoardArduino::gblBroadcastChannelLost = false;
 uint8_t GoGoBoardArduino::gbl1stExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t GoGoBoardArduino::gbl2ndExtCMDBuffer[GOGO_DEFAULT_BUFFER_SIZE] = {0};
 uint8_t *GoGoBoardArduino::gblActiveBuffer = NULL;
@@ -119,6 +123,17 @@ void GoGoBoardArduino::gogoSerialEvent()
     }
 }
 
+//? "key,value" frames: the key ends at the first comma, the value is the
+//? rest of the text and may contain commas ("hello, world", JSON).
+char *GoGoBoardArduino::splitAtFirstComma(char *text)
+{
+    char *comma = strchr(text, ',');
+    if (comma == NULL)
+        return text + strlen(text);
+    *comma = '\0';
+    return comma + 1;
+}
+
 void GoGoBoardArduino::processPacket()
 {
     if (gblNewExtCmdReady)
@@ -132,6 +147,8 @@ void GoGoBoardArduino::processPacket()
         //? gblRequestResponseAvailable, gblResponseArduinoInit,
         //? _gmessage_list, _broadcast_list, or _cloudmessage_list.
         //? These are all read by the user's loop() task.
+        //? Set under the state mutex, answered after it is released.
+        bool helloRequested = false;
         if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
         {
 #endif
@@ -145,8 +162,25 @@ void GoGoBoardArduino::processPacket()
                     break;
 
                 case CMD_ARDUINO_INIT:
+                    //? The main board sends this ack after every reset of its
+                    //? extension tables (INIT, its own reboot), so the topics
+                    //? it knew and the broadcast channel are gone. Clearing
+                    //? the lists makes receiveBroadcast() and
+                    //? isCloudMessageAvailable() subscribe again.
                     gblResponseArduinoInit = true;
+                    _broadcast_list.clear();
+                    _cloudmessage_list.clear();
+                    gblBroadcastChannelLost = true;
                     break;
+
+#if defined(ARDUINO_ARCH_ESP32)
+                //? The main board's co-MCU detector asks who is on the link
+                //? when it reboots while this board keeps running. STM32
+                //? runs this in a timer ISR, so only ESP32 answers.
+                case CMD_HELLO:
+                    helloRequested = true;
+                    break;
+#endif
 
                 default:
                     break;
@@ -157,10 +191,11 @@ void GoGoBoardArduino::processPacket()
             {
                 gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
 
-                char *p = (char *)gblActiveBuffer + 2;
-                _key = String(strtok_r(p, ",", &p));
+                char *text = (char *)gblActiveBuffer + 2;
+                char *value = splitAtFirstComma(text);
+                _key = String(text);
 
-                _gmessage_list[_key].stringValue = String(strtok_r(p, ",", &p));
+                _gmessage_list[_key].stringValue = String(value);
                 _gmessage_list[_key].isNewValue = true;
                 break;
             }
@@ -169,8 +204,9 @@ void GoGoBoardArduino::processPacket()
             {
                 gblActiveBuffer[gblActiveBuffer[1] + 2] = '\0'; //? add null terminator
 
-                char *p = (char *)gblActiveBuffer + 2;
-                _topic = String(strtok_r(p, ",", &p));
+                char *text = (char *)gblActiveBuffer + 2;
+                char *payload = splitAtFirstComma(text);
+                _topic = String(text);
 
                 if (gblActiveBuffer[0] == IOT_BROADCAST_PROCESS_ID)
                 {
@@ -178,7 +214,7 @@ void GoGoBoardArduino::processPacket()
                 }
                 else if (gblActiveBuffer[0] == IOT_CLOUD_MESSAGE_PROCESS_ID)
                 {
-                    _cloudmessage_list[_topic].stringValue = String(strtok_r(p, ",", &p));
+                    _cloudmessage_list[_topic].stringValue = String(payload);
                     _cloudmessage_list[_topic].isNewValue = true;
                 }
                 break;
@@ -187,6 +223,8 @@ void GoGoBoardArduino::processPacket()
 #if defined(ARDUINO_ARCH_ESP32)
             xSemaphoreGive(gogoStateMutex);
         }
+        if (helloRequested)
+            sendHello();
 #endif
     }
 }
@@ -341,7 +379,19 @@ void GoGoBoardArduino::sendHello(void)
         GOGOBOARD_LIB_VERSION_MINOR,
         GOGOBOARD_LIB_VERSION_PATCH,
     };
-    sendCmdPacket(hello, sizeof(hello));
+    //? Own frame buffer, sent in one write(): the gogoSerial task answers
+    //? a HELLO request with this while the sketch may be halfway through
+    //? a send that uses the shared cmdDynamicPkt. One write() keeps the
+    //? frame whole on the wire.
+    uint8_t frame[BYTE_HEADER_OFFSET + sizeof(hello) + 1] = {
+        SERIAL_1ST_HEADER,
+        SERIAL_2ND_HEADER,
+        ARDUINO_CMD_PACKET_TYPE,
+        sizeof(hello) + 1, //? LEN counts the checksum byte
+    };
+    memcpy(frame + BYTE_HEADER_OFFSET, hello, sizeof(hello));
+    frame[sizeof(frame) - 1] = std::accumulate(hello, hello + sizeof(hello), 0);
+    gogoSerial.write(frame, sizeof(frame));
 }
 
 int GoGoBoardArduino::readInput(uint8_t port)
@@ -578,19 +628,41 @@ String GoGoBoardArduino::Gmessage(const String &key, const String &defaultValue)
 
 void GoGoBoardArduino::setBroadcastChannel(uint32_t channel)
 {
+    _broadcastChannel = channel;
+    _hasBroadcastChannel = true;
     _dataStr = String(channel);
 
     sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SET_CHANNEL, (uint8_t *)_dataStr.c_str(), _dataStr.length());
 }
 
+void GoGoBoardArduino::restoreBroadcastChannel(void)
+{
+    bool lost = false;
+#if defined(ARDUINO_ARCH_ESP32)
+    if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
+    {
+        lost = gblBroadcastChannelLost;
+        gblBroadcastChannelLost = false;
+        xSemaphoreGive(gogoStateMutex);
+    }
+#else
+    lost = gblBroadcastChannelLost;
+    gblBroadcastChannelLost = false;
+#endif
+    if (lost && _hasBroadcastChannel)
+        setBroadcastChannel(_broadcastChannel);
+}
+
 void GoGoBoardArduino::sendBroadcast(const String &topic)
 {
+    restoreBroadcastChannel();
     if (gblResponseArduinoInit)
         sendIoTPacket(CATEGORY_IOT_BROADCAST, IOT_BROADCAST_SEND, (uint8_t *)topic.c_str(), topic.length());
 }
 
 bool GoGoBoardArduino::receiveBroadcast(const String &topic)
 {
+    restoreBroadcastChannel();
 #if defined(ARDUINO_ARCH_ESP32)
     bool found = false;
     bool status = false;

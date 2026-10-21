@@ -15,11 +15,12 @@
 #define SERIAL_1ST_HEADER                   0x54
 #define SERIAL_2ND_HEADER                   0xFE
 
-#define GOGO_DEFAULT_BAUDRATE               921600
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
 #if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
 //? GoGo6 hardware (STM32F103) — original pin map
+#define GOGO_DEFAULT_BAUDRATE               921600
+
 #define GOGO_BOOT_BUTTON                    PB2
 #define GOGO_LED_PIN                        PB12
 
@@ -61,6 +62,20 @@
 //? Pin numbers on the C3 side depend on PCB routing.
 #define GOGO7_RX_PIN                        20
 #define GOGO7_TX_PIN                        21
+//? Must match the S3-side EXT_SERIAL_BAUDRATE, fixed at 115200 on GoGo 7.
+#define GOGO_DEFAULT_BAUDRATE               115200
+#endif
+
+//? GPIO20/21 are also UART0's default pins. With "USB CDC On Boot" disabled
+//? (the default), Serial is UART0 and Serial.begin() moves the pins from the
+//? GoGo link to UART0, which cuts the link. Sketches that include this header
+//? get the C3's USB port as Serial instead, the port the sketch was uploaded
+//? through. Serial0 stays UART0 and must not be used.
+#if defined(ARDUINO_ARCH_ESP32) && !ARDUINO_USB_CDC_ON_BOOT && SOC_USB_SERIAL_JTAG_SUPPORTED
+#define GOGO_SERIAL_ON_USB_JTAG
+extern HWCDC GoGoUSBSerial;
+#undef Serial
+#define Serial GoGoUSBSerial
 #endif
 
 #define ARDUINO_INIT_DEFAULT                0
@@ -136,8 +151,11 @@
 #define CMD_ARDUINO_INIT                    210
 
 //? HELLO handshake — emitted on begin() with a self-identifying payload
-//? so the main board (or future auto-detect logic) can tell which co-MCU
-//? firmware is running. Mirrors the role of T_HELLO on the Vernier link.
+//? so the main board's co-MCU detector can tell which co-MCU firmware is
+//? running. Mirrors the role of T_HELLO on the Vernier link. The main
+//? board can also ask for it again (it reboots alone, this board keeps
+//? running): ARDUINO_REQUEST_PACKET_TYPE frame 54 FE 20 02 DC DC, data
+//? byte CMD_HELLO. ESP32 answers with the same HELLO frame.
 #define CMD_HELLO                           220
 
 //? Firmware identity carried in the HELLO payload. Reserved values:
@@ -272,6 +290,7 @@ public:
 private:
     // static void resetCallback(void);
     static void irqCallback(void);
+    static char *splitAtFirstComma(char *text);
 
 
     static uint8_t gblExtSerialState;
@@ -283,6 +302,8 @@ private:
     static bool gblNewExtCmdReady;
     static bool gblRequestResponseAvailable;
     static bool gblResponseArduinoInit;
+    //? Set by the gogoSerial task on the init ack, read under the state mutex.
+    static volatile bool gblBroadcastChannelLost;
     static uint8_t gbl1stExtCMDBuffer[];
     static uint8_t gbl2ndExtCMDBuffer[];
     static uint8_t *gblActiveBuffer;
@@ -301,12 +322,19 @@ private:
     void sendIoTPacket(uint8_t categoryID, uint8_t cmdID, uint8_t *data, uint8_t length, bool isCmd = false);
 
     //? Emits CMD_HELLO with firmware ID + version so the main board can
-    //? identify which co-MCU firmware is talking. Called from begin().
-    void sendHello(void);
+    //? identify which co-MCU firmware is talking. Called from begin() and,
+    //? on ESP32, from the gogoSerial task when the main board asks.
+    static void sendHello(void);
 
     void sendReportPacket(uint8_t *data, uint8_t length);
 
     String _dataStr;
+
+    //? Last setBroadcastChannel() value. The main board keeps it in RAM only,
+    //? so it is sent again after the main board's init ack.
+    uint32_t _broadcastChannel = 0;
+    bool _hasBroadcastChannel = false;
+    void restoreBroadcastChannel(void);
 
     uint8_t dataPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0};
     uint8_t cmdDynamicPkt[GOGO_DEFAULT_BUFFER_SIZE] = {0x54, 0xfe, ARDUINO_CMD_PACKET_TYPE};
