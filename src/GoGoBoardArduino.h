@@ -280,6 +280,7 @@ public:
 private:
     // static void resetCallback(void);
     static void irqCallback(void);
+    static char *splitAtFirstComma(char *text);
 
 
     static uint8_t gblExtSerialState;
