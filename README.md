@@ -75,7 +75,6 @@ void loop()
 |              |                                                                                                                                |
 | **IoT**      | `connectToWifi(ssid, password)`                   | strings                        | —                            |
 |              | `setBroadcastChannel(channel)`                    | uint32                         | —                            |
-|              | `setBroadcastPassword(password)`                  | string                         | —                            |
 |              | `sendBroadcast(topic)`                            | string                         | —                            |
 |              | `receiveBroadcast(topic)`                         | string                         | bool — new message?          |
 |              | `sendCloudMessage(topic, value)`                  | topic, float / String          | —                            |
