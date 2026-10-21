@@ -66,6 +66,18 @@
 #define GOGO_DEFAULT_BAUDRATE               115200
 #endif
 
+//? GPIO20/21 are also UART0's default pins. With "USB CDC On Boot" disabled
+//? (the default), Serial is UART0 and Serial.begin() moves the pins from the
+//? GoGo link to UART0, which cuts the link. Sketches that include this header
+//? get the C3's USB port as Serial instead, the port the sketch was uploaded
+//? through. Serial0 stays UART0 and must not be used.
+#if defined(ARDUINO_ARCH_ESP32) && !ARDUINO_USB_CDC_ON_BOOT && SOC_USB_SERIAL_JTAG_SUPPORTED
+#define GOGO_SERIAL_ON_USB_JTAG
+extern HWCDC GoGoUSBSerial;
+#undef Serial
+#define Serial GoGoUSBSerial
+#endif
+
 #define ARDUINO_INIT_DEFAULT                0
 #define ARDUINO_INIT_IOT                    1
 
