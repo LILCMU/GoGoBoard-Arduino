@@ -170,7 +170,7 @@ extern HWCDC GoGoUSBSerial;
 
 //? Library version, sent inside the HELLO payload. Keep in sync with
 //? library.properties `version=` field.
-#define GOGOBOARD_LIB_VERSION_MAJOR         2
+#define GOGOBOARD_LIB_VERSION_MAJOR         3
 #define GOGOBOARD_LIB_VERSION_MINOR         0
 #define GOGOBOARD_LIB_VERSION_PATCH         0
 
