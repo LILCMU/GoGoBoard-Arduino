@@ -18,7 +18,13 @@ HardwareSerial& gogoSerial = Serial1;
 #include <HardwareTimer.h>
 #include <USBSerial.h>
 extern USBSerial SerialUSB;
+//? stm32duino core 3.x made arduino::HardwareSerial an abstract interface;
+//? the concrete UART class is now `Uart`. Core 2.x only has HardwareSerial.
+#if STM32_CORE_VERSION_MAJOR >= 3
+Uart gogoSerial(PA10, PA9);
+#else
 HardwareSerial gogoSerial(PA10, PA9);
+#endif
 
 #elif defined(ARDUINO_ARCH_ESP32)
 //? GoGo7 co-MCU. Native USB-CDC is `Serial`; the GoGo-facing UART is
