@@ -11,6 +11,8 @@ Arduino library for the **co-MCU** built into GoGoBoard. Lets a student-written 
 
 The library auto-detects the platform via `__STM32F1__` / `ARDUINO_ARCH_STM32` / `ARDUINO_ARCH_ESP32` macros — same source, no per-board sketch changes.
 
+stm32duino core 2.7.1 and 3.0.0 are both supported (build-tested on `nucleo_f411re` with `-DUSBCON -DUSBD_USE_CDC`). On macOS (case-insensitive filesystem) PlatformIO builds with core 3.0.0 fail because the PlatformIO builder puts `cores/arduino/api` on the include path, so `api/String.h` shadows `<string.h>` (`strlen` not declared in `USBSerial.cpp`); build on a case-sensitive volume or Linux. The Arduino IDE / arduino-cli are not affected.
+
 ## Install
 
 **Arduino IDE.** *Sketch → Include Library → Manage Libraries…* → search "GoGoBoard Arduino Library" → Install.
