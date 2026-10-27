@@ -17,6 +17,10 @@
 
 #define GOGO_DEFAULT_BUFFER_SIZE            256
 
+//? readInput() gives up and returns 0 when the main board has not answered
+//? by then. The main board reads the link every 50 ms and answers within about 60 ms.
+#define GOGO_READ_INPUT_TIMEOUT_MS          100
+
 #if defined(__STM32F1__) || defined(ARDUINO_ARCH_STM32)
 //? GoGo6 hardware (STM32F103) — original pin map
 #define GOGO_DEFAULT_BAUDRATE               921600
@@ -300,7 +304,11 @@ private:
     static uint8_t gblExtSerialCmdCounter;
     static bool gblUseFirstExtCmdBuffer;
     static bool gblNewExtCmdReady;
-    static bool gblRequestResponseAvailable;
+#if !defined(ARDUINO_ARCH_ESP32)
+    static volatile bool gblInputReplyReady;
+#endif
+    static volatile int gblInputReplyValue;
+    static bool waitInputReply(uint32_t timeoutMs); //? takes the next reply to a read request; see readInput()
     static bool gblResponseArduinoInit;
     //? Set by the gogoSerial task on the init ack, read under the state mutex.
     static volatile bool gblBroadcastChannelLost;

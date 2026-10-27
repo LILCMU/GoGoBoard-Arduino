@@ -44,13 +44,13 @@ void loop()
 
 ### Compatibility note
 
-`GoGoBoard.begin()` blocks for ~2 s after boot to let the main board come up; that's the same on both targets. Everything else is non-blocking.
+`GoGoBoard.begin()` blocks for ~2 s after boot to let the main board come up; that's the same on both targets. Every command waits 10 ms before it is sent, and `readInput()` also waits for the main board's answer (up to 100 ms, normally 10-60 ms). After a `readInput()` that returned 0 because no answer came in time, the next one first waits up to 100 ms for that late answer, so it is not mistaken for its own (it does not wait if the call before that also got no answer). An answer later than that can still be returned as another call's value. Everything else is non-blocking.
 
 ## API
 
 |              | Function                                          | Parameter(s)                   | Return                       |
 | ------------ | ------------------------------------------------- | ------------------------------ | ---------------------------- |
-| **Sensor**   | `readInput(port)`                                 | port number (1–4)              | sensor value (0–1023)        |
+| **Sensor**   | `readInput(port)`                                 | port number (1–4)              | sensor value (0–1023); 0 if the main board does not answer within 100 ms |
 |              |                                                                                                                                |
 | **Servo**    | `talkToServo("ports")`                            | port string e.g. `"13"`        | —                            |
 |              | `talkToServo(p1, p2, p3, p4)`                     | port numbers (1–4)             | —                            |
