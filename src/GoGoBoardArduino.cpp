@@ -37,6 +37,11 @@ static SemaphoreHandle_t gogoStateMutex = NULL;
 static SemaphoreHandle_t gogoInputReplySemaphore = NULL;
 #endif
 
+//? Read requests sent whose reply readInput() has not taken yet, and whether an owed reply failed to come within one
+//? timeout (the main board is not answering). Only readInput() touches them.
+static uint8_t gogoInputRepliesOwed = 0;
+static bool gogoInputLinkSilent = false;
+
 GoGoBoardArduino GoGoBoard;
 
 uint8_t GoGoBoardArduino::gblExtSerialState = SER_WAITING_FOR_1ST_HEADER;
@@ -133,7 +138,7 @@ void GoGoBoardArduino::processPacket()
 
 #if defined(ARDUINO_ARCH_ESP32)
         //? Acquire the shared-state mutex before touching
-        //? gblInputReplyValue, gblResponseArduinoInit,
+        //? gblResponseArduinoInit,
         //? _gmessage_list, _broadcast_list, or _cloudmessage_list.
         //? These are all read by the user's loop() task.
         if (xSemaphoreTake(gogoStateMutex, pdMS_TO_TICKS(10)) == pdTRUE)
@@ -145,6 +150,7 @@ void GoGoBoardArduino::processPacket()
                 switch ((gblActiveBuffer[0]))
                 {
                 case REQ_READ_INPUT:
+                    //? readInput() does not take the state mutex: the semaphore (ESP32) or flag (STM32) below hands it this value.
                     gblInputReplyValue = (int)gblActiveBuffer[1] << 8 | gblActiveBuffer[2];
 #if defined(ARDUINO_ARCH_ESP32)
                     xSemaphoreGive(gogoInputReplySemaphore);
@@ -354,32 +360,54 @@ void GoGoBoardArduino::sendHello(void)
     sendCmdPacket(hello, sizeof(hello));
 }
 
+//? Waits up to timeoutMs for the next reply to a read request and takes it. False if none came.
+bool GoGoBoardArduino::waitInputReply(uint32_t timeoutMs)
+{
+#if defined(ARDUINO_ARCH_ESP32)
+    return xSemaphoreTake(gogoInputReplySemaphore, pdMS_TO_TICKS(timeoutMs)) == pdTRUE;
+#else
+    const uint32_t start = millis();
+    while (!gblInputReplyReady)
+    {
+        if (millis() - start >= timeoutMs)
+            return false;
+    }
+    gblInputReplyReady = false;
+    return true;
+#endif
+}
+
 int GoGoBoardArduino::readInput(uint8_t port)
 {
     if (port < 1 || port > 4)
         return 0;
 
-    //? The main board answers 10-60 ms later and the reply carries no port,
-    //? so a reply that missed an earlier call's window is dropped first.
-    //? Otherwise it would be returned as this call's value.
-#if defined(ARDUINO_ARCH_ESP32)
-    xSemaphoreTake(gogoInputReplySemaphore, 0);
-    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
-    if (xSemaphoreTake(gogoInputReplySemaphore, pdMS_TO_TICKS(GOGO_READ_INPUT_TIMEOUT_MS)) != pdTRUE)
-        return 0;
-    int result = gblInputReplyValue;
-#else
-    gblInputReplyReady = false;
-    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
-    uint32_t start = millis();
-    while (!gblInputReplyReady)
+    //? The main board's reply carries no port, and replies come in the order of the requests. A call that gave up
+    //? leaves its reply owed: wait it out and throw it away, or it would be returned as this call's value and every
+    //? later call would stay one behind. If an owed reply does not come within one timeout (a lost frame, or a main
+    //? board that does not answer), stop waiting for owed replies until one is heard again, so a silent main board
+    //? does not make every call twice as slow.
+    while (gogoInputRepliesOwed > 0)
     {
-        if (millis() - start >= GOGO_READ_INPUT_TIMEOUT_MS)
-            return 0;
+        if (gogoInputLinkSilent || !waitInputReply(GOGO_READ_INPUT_TIMEOUT_MS))
+        {
+            gogoInputLinkSilent = true;
+            gogoInputRepliesOwed = 0;
+            break;
+        }
+        gogoInputRepliesOwed--;
     }
-    int result = gblInputReplyValue;
-#endif
-    return result;
+
+    gogoInputRepliesOwed++;
+    sendCmdPacket(CMD_PACKET, REQ_READ_INPUT, (port - 1), 0, false);
+    //? sendCmdPacket() waits 10 ms before it writes. A reply nobody asked for that came in meanwhile is not this
+    //? call's, and its own cannot be here yet: the request has only just left.
+    waitInputReply(0);
+    if (!waitInputReply(GOGO_READ_INPUT_TIMEOUT_MS))
+        return 0;
+    gogoInputLinkSilent = false;
+    gogoInputRepliesOwed--;
+    return gblInputReplyValue;
 }
 
 void GoGoBoardArduino::talkToServo(String servo_port)
