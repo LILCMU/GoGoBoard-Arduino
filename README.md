@@ -52,7 +52,7 @@ The main board answers the library's init a moment after `GoGoBoard.begin()` ret
 
 Broadcast and cloud-message calls (`sendBroadcast()`, `receiveBroadcast()`, `sendCloudMessage()`, `isCloudMessageAvailable()`) made while the board is offline are sent to the main board, but they don't reach the cloud: a message sent then is dropped, not queued, and no message comes in. `receiveBroadcast()` and `isCloudMessageAvailable()` re-send the subscribe for a topic on every call until its first message arrives, so a topic subscribes once the board is online. Keep calling them from `loop()`.
 
-This needs GoGo Board 7 firmware that answers the init while offline: 4.0.0 stable or newer. The 4.0.0-preview and the 4.0.0 dev builds don't. On older firmware the main board answers the init only once it is online, and until then the library skips these four calls.
+This needs GoGo Board 7 firmware that answers the init while offline: 4.0.0 stable or newer. The 4.0.0-preview and the 4.0.0 dev builds made before gogo-firmware !259 don't. On older firmware the main board answers the init only once it is online, and until then the library skips these four calls.
 
 ## API
 
