@@ -185,12 +185,9 @@ void GoGoBoardArduino::processPacket()
                 case CMD_ARDUINO_INIT:
                     //? The main board sends this ack after every reset of its
                     //? extension tables (INIT, its own reboot), so the topics
-                    //? it knew and the broadcast channel are gone, and again
-                    //? the first time its messaging connects after an
-                    //? offline ack, since it drops subscribe requests while
-                    //? offline. Clearing the lists makes
-                    //? receiveBroadcast() and isCloudMessageAvailable()
-                    //? subscribe again.
+                    //? it knew and the broadcast channel are gone. Clearing
+                    //? the lists makes receiveBroadcast() and
+                    //? isCloudMessageAvailable() subscribe again.
                     gblResponseArduinoInit = true;
                     _broadcast_list.clear();
                     _cloudmessage_list.clear();
