@@ -146,7 +146,7 @@ The library speaks a length-framed packet protocol over UART to the GoGo main bo
 - `ARDUINO_GMESSAGE` (key/value bridge with Logo)
 - `ARDUINO_IOT` (broadcast + cloud-message)
 
-Frames begin with `0x54 0xFE`, then `[type][length][payload][xor checksum]`. Background packet handling runs in:
+Frames begin with `0x54 0xFE`, then `[type][length][payload][checksum]`; the checksum is the low byte of the sum of the payload bytes. Background packet handling runs in:
 - **GoGo Board 6** — `Timer1` / `HardwareTimer TIM1` ISR fires every 1 ms, calls `gogoSerialEvent()` + `processPacket()`.
 - **GoGo Board 7** — dedicated FreeRTOS task `gogoSerialTask`, same body, same 1 ms cadence, runs in task context (Serial-safe on ESP32).
 
