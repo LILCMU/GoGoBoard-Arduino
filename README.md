@@ -48,11 +48,11 @@ void loop()
 
 ### When the board is offline
 
-The library is ready right after `GoGoBoard.begin()`: the main board answers its init at once, with or without a network. Sensors, outputs, servos, the beeper and Gmessage never need the network.
+The main board answers the library's init a moment after `GoGoBoard.begin()` returns, with or without a network. A `sendBroadcast()` or `sendCloudMessage()` made before that answer arrives is skipped. Sensors, outputs, servos, the beeper and Gmessage never need the network.
 
-Broadcast and cloud-message calls (`sendBroadcast()`, `receiveBroadcast()`, `sendCloudMessage()`, `isCloudMessageAvailable()`) made while the board is offline are sent to the main board, but they don't reach the cloud: a message sent then is dropped, not queued, and no message comes in. When the board comes online, the main board tells the library again and the library makes its subscriptions again, on the next `receiveBroadcast()` / `isCloudMessageAvailable()` call for each topic, so keep calling them from `loop()`.
+Broadcast and cloud-message calls (`sendBroadcast()`, `receiveBroadcast()`, `sendCloudMessage()`, `isCloudMessageAvailable()`) made while the board is offline are sent to the main board, but they don't reach the cloud: a message sent then is dropped, not queued, and no message comes in. The main board sends its init ack again the first time its messaging connects after an offline ack, and the library subscribes again on the next `receiveBroadcast()` / `isCloudMessageAvailable()` call for each topic. Those calls also re-send the subscribe for a topic that has had no message yet, which covers later network drops, so keep calling them from `loop()`.
 
-This needs main-board firmware that answers the init while offline. Older firmware answers only once the board is online, and until then the library skips these four calls.
+This needs GoGo Board 7 firmware 4.0.0 or newer. Older firmware, and GoGo Board 6, answer the init only once the board is online, and until then the library skips these four calls.
 
 ## API
 
