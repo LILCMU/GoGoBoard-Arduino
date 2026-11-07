@@ -52,7 +52,7 @@ On GoGo Board 7, the main board answers the library's init only once it is onlin
 
 Cloud messages also need the board's cloud broker, a separate connection: a `sendCloudMessage()` made before it connects is lost, and `isCloudMessageAvailable()` asks again on its next call.
 
-If the board goes offline after its first answer (Wi-Fi drops, or the main board restarts while the library keeps running), the library still sends these calls and the main board drops them; nothing is queued. Topics already subscribed come back by themselves when the board reconnects.
+If the board goes offline after its first answer (Wi-Fi drops, or the main board restarts while the library keeps running), the library still sends these calls and the main board drops them; nothing is queued. After a Wi-Fi drop, topics already subscribed come back by themselves. After a main-board restart, the main board answers the init again once it is online, and each topic subscribes again on its next `receiveBroadcast()` / `isCloudMessageAvailable()` call.
 
 Sensors (`readInput()`), outputs, servos, the beeper, Gmessage and `setBroadcastChannel()` never wait for that answer, so they work while the board is offline.
 
