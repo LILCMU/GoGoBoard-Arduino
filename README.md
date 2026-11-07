@@ -46,6 +46,16 @@ void loop()
 
 `GoGoBoard.begin()` blocks for ~2 s after boot to let the main board come up; that's the same on both targets. Every command waits 10 ms before it is sent, and `readInput()` also waits for the main board's answer (up to 100 ms, normally 10-60 ms). After a `readInput()` that returned 0 because no answer came in time, the next one first waits up to 100 ms for that late answer, so it is not mistaken for its own (it does not wait if the call before that also got no answer). An answer later than that can still be returned as another call's value. Everything else is non-blocking.
 
+### When the board is offline
+
+On GoGo Board 7, the main board answers the library's init only once it is online (connected to the message broker, checked once a second). That answer means "the network is ready". From `GoGoBoard.begin()` until the first answer, the library skips the four network calls: `sendBroadcast()` and `sendCloudMessage()` send nothing, and `receiveBroadcast()` and `isCloudMessageAvailable()` send no subscribe and return no message. All four return at once, so `loop()` keeps running. After the answer, `receiveBroadcast()` and `isCloudMessageAvailable()` subscribe on their next call. Keep calling them from `loop()`.
+
+Cloud messages also need the board's cloud broker, a separate connection: a `sendCloudMessage()` made before it connects is lost, and `isCloudMessageAvailable()` asks again on its next call.
+
+If the board goes offline after its first answer (Wi-Fi drops, or the main board restarts while the library keeps running), the library still sends these calls and the main board drops them; nothing is queued. After a Wi-Fi drop, topics already subscribed come back by themselves. After a main-board restart, the main board answers the init again once it is online, and each topic subscribes again on its next `receiveBroadcast()` / `isCloudMessageAvailable()` call.
+
+Sensors (`readInput()`), outputs, servos, the beeper, Gmessage and `setBroadcastChannel()` never wait for that answer, so they work while the board is offline.
+
 ## API
 
 |              | Function                                          | Parameter(s)                   | Return                       |
