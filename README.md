@@ -48,11 +48,9 @@ void loop()
 
 ### When the board is offline
 
-The main board answers the library's init a moment after `GoGoBoard.begin()` returns, with or without a network. A `sendBroadcast()` or `sendCloudMessage()` made before that answer arrives is skipped. Sensors, outputs, servos, the beeper and Gmessage never need the network.
+The main board answers the library's init only once it is online (on GoGo Board 7: connected to the message broker, checked once a second). That answer means "the network is ready". Until it arrives, the library skips the four network calls: `sendBroadcast()` and `sendCloudMessage()` send nothing, and `receiveBroadcast()` and `isCloudMessageAvailable()` send no subscribe and return no message. All four return at once, so `loop()` keeps running. Once the answer arrives, `receiveBroadcast()` and `isCloudMessageAvailable()` subscribe on their next call. Keep calling them from `loop()`.
 
-Broadcast and cloud-message calls (`sendBroadcast()`, `receiveBroadcast()`, `sendCloudMessage()`, `isCloudMessageAvailable()`) made while the board is offline are sent to the main board, but they don't reach the cloud: a message sent then is dropped, not queued, and no message comes in. `receiveBroadcast()` and `isCloudMessageAvailable()` re-send the subscribe for a topic on every call until its first message arrives, so a topic subscribes once the board is online. Keep calling them from `loop()`.
-
-This needs GoGo Board 7 firmware that answers the init while offline: 4.0.0 stable or newer. The 4.0.0-preview and the 4.0.0 dev builds made before gogo-firmware !259 don't. On older firmware the main board answers the init only once it is online, and until then the library skips these four calls.
+Sensors (`readInput()`), outputs, servos, the beeper, Gmessage and `setBroadcastChannel()` never wait for that answer, so they work while the board is offline.
 
 ## API
 
