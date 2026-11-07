@@ -866,7 +866,7 @@ void GoGoBoardArduino::sendCmdPacket(uint8_t categoryID, uint8_t cmdID, uint8_t 
     cmdDynamicPkt[BYTE_TARGET] = targetVal;
     cmdDynamicPkt[BYTE_DATA] = value >> 8;
     cmdDynamicPkt[BYTE_DATA + 1] = value & 0xFF;
-    cmdDynamicPkt[BYTE_CHECKSUM] = categoryID + cmdID + targetVal + value;
+    cmdDynamicPkt[BYTE_CHECKSUM] = std::accumulate(cmdDynamicPkt + BYTE_HEADER_OFFSET, cmdDynamicPkt + BYTE_CHECKSUM, 0);
 
     delay(10);
     gogoSerial.write(cmdDynamicPkt, 11);
